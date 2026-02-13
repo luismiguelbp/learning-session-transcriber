@@ -1,0 +1,45 @@
+# Example audio_metadata.yaml for the audio joiner module.
+# Copy this file into your session folder (e.g. sessions/MyAudioSession/audio_metadata.yaml)
+# and place your WAV or MP3 files in the same folder.
+#
+# Run: python -m learning_session_transcriber.audio_joiner --session sessions/MyAudioSession/
+#
+# Template variables (resolved at runtime via Python str.format()):
+#
+#   per_file section and output_filename/joined:
+#     {session_name}  - Session folder name (e.g. MyAudioSession)
+#
+#   per_file only:
+#     {index}         - 1-based position of the file (1, 2, 3, ...)
+#     {filename}      - Original filename without extension
+#
+#   output_filename and joined only:
+#     {total_files}   - Number of audio files in the session
+
+# Silence gap between audio segments (seconds)
+silence_gap_seconds: 3
+
+# Output filename for the joined MP3. Variables: {session_name}, {total_files}
+# Default if omitted: "{session_name}_joined.mp3"
+output_filename: "{session_name}_joined.mp3"
+
+# --- ID3v1 metadata applied to each individual MP3 (during WAV->MP3 conversion) ---
+# Variables: {index} (1-based), {filename} (no extension), {session_name}
+# All fields optional. Max lengths: title/artist/album/comment 30 chars, year 4 chars, genre 0-79 or name.
+per_file:
+  title: "{session_name}_{index}"
+  artist: "Artist Name"
+  album: "Album Name"
+  year: "YYYY"
+  comment: "Part {index}"
+  genre: "Education"
+
+# --- ID3v1 metadata applied to the final joined MP3 ---
+# Variables: {session_name}, {total_files}
+joined:
+  title: "{session_name} - Complete"
+  artist: "Artist Name"
+  album: "Album Name"
+  year: "YYYY"
+  comment: "{total_files} parts joined"
+  genre: "Education"
