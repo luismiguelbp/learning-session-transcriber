@@ -1,0 +1,69 @@
+content_name: 20260211_210000_example_session
+topic: "Example session - generic topic"
+language: "es"           # optional, defaults to "es"
+llm_model: "gpt-5-mini"  # optional default model for prompts
+
+# Optional: which prompts file to use (path relative to this session's directory).
+# If omitted, the default prompts.yaml at project root will be used.
+# For most cases you will want to reuse the shared prompts file:
+# prompts_file: "prompts.yaml"
+
+# Optional: extra resources to attach when running prompts. Keys requested by
+# prompts in prompts.yaml (e.g. include_resources: [pdf, notes]) are resolved from
+# this map. Paths are relative to the session directory (same folder as this file).
+# Key "pdf" must point to a .pdf file (sent as base64 to the model). Key "notes" must
+# point to a .txt file. Use a vision-capable model (e.g. gpt-4o, gpt-5) when using PDFs.
+# Example:
+# include_resources:
+#   pdf: "material.pdf"
+#   notes: "apuntes.txt"
+
+# Optional post‑processing configuration for transcripts and main document.
+# Names must match entries defined in prompts.yaml.
+# For example:
+# - per_video:       summary, key_concepts, clean_transcript
+# - main_document:   study_guide, executive_summary, unified_document
+#
+# You can configure one or multiple prompts for the main document:
+#
+# main_postprocess_prompts:
+#   - "study_guide"
+#   - "executive_summary"
+#   - "unified_document"
+#
+# In this example we only use one:
+main_postprocess_prompts:
+  - "study_guide"
+
+videos:
+  # Example 1: video downloaded from a URL (e.g. Google Drive, YouTube, etc.)
+  - index: 1
+    title: "Example Class 1"
+    url: "https://example.com/your_video_link_1"
+    # Optional: choose which per_video prompts (from prompts.yaml) to use
+    # when post‑processing this video's transcript.
+    #
+    # You can configure one or multiple prompts. For example:
+    #   postprocess_prompts:
+    #     - "summary"
+    #     - "key_concepts"
+    #     - "clean_transcript"
+    #
+    # In this example we only use one:
+    postprocess_prompts:
+      - "summary"
+
+  # Example 2: second part also from URL
+  - index: 2
+    title: "Example Class 2"
+    url: "https://example.com/your_video_link_2"
+    postprocess_prompts:
+      - "key_concepts"
+
+  # Example 3: local recording already on your disk
+  # (uncomment and adjust path if you want to copy from a local file instead of downloading)
+  # - index: 3
+  #   title: "Class 3 - Preguntas y respuestas"
+  #   # NOTE: local_path is resolved relative to the current working directory,
+  #   # not automatically relative to this YAML file.
+  #   local_path: "/absolute/or/relative/path/to/Example_Class_1_local.mp4"

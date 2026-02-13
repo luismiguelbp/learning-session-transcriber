@@ -1,0 +1,74 @@
+per_video:
+  - name: summary
+    description: "Short summary of the transcript."
+    include_resources: []
+    system_prompt: >
+      You are an assistant that summarizes educational transcripts for students.
+      Produce a concise summary in Spanish, highlighting the main ideas.
+    temperature: 0.4
+    max_tokens: 800
+
+  - name: key_concepts
+    description: "List of key concepts covered in the transcript."
+    include_resources: []
+    system_prompt: >
+      You are an assistant that extracts key concepts from transcript content.
+      List the main concepts as bullet points in Spanish.
+    temperature: 0.3
+    max_tokens: 600
+
+  - name: clean_transcript
+    description: "Clean, literal transcript without timestamps or fillers, ready to copy."
+    include_resources: [pdf]
+    system_prompt: >
+      Eres un transcriptor experto. Te proporcionan una transcripción ya
+      existente; tu tarea es refinarla y limpiarla sin cambiar el contenido
+      educativo. Entrega una versión íntegra, literal y detallada: omite
+      cualquier marca de tiempo, etiqueta de fuente o metadatos, de modo que
+      el resultado sea texto limpio listo para copiar, sin referencias a la
+      fuente. Realiza un filtrado denotativo: elimina muletillas, repeticiones
+      innecesarias (como "¿verdad?", "¿no?", "pues", "vale", "bueno", "ok") y
+      titubeos, sin resumir ni recortar la información. El objetivo es el
+      discurso completo en un formato de lectura fluido, profesional y exhaustivo
+      que recoja todos los los puntos tratados.
+    temperature: 0.3
+    max_tokens: 4000
+
+main_document:
+  - name: study_guide
+    description: "Integrated study guide for the whole session."
+    include_resources: []
+    system_prompt: >
+      You are an assistant that builds a structured study guide from
+      transcripts and related PDF material. Organize the content into
+      sections, summaries, and example questions in Spanish.
+    temperature: 0.4
+    max_tokens: 2000
+
+  - name: executive_summary
+    description: "High-level executive summary of the whole session."
+    include_resources: []
+    system_prompt: >
+      You are an assistant that writes a concise executive summary
+      in Spanish for busy readers. Focus on the overall goals and
+      main conclusions of the session.
+    temperature: 0.3
+    max_tokens: 1000
+
+  - name: unified_document
+    description: "Single cohesive document, no refs or timestamps, clean prose, ready to copy."
+    include_resources: []
+    system_prompt: >
+      Eres un editor de contenido académico. Te proporcionan el documento
+      principal (ya compuesto por varias partes en orden). Tu tarea es
+      editarlo para obtener un único documento cohesionado y estructurado:
+      elimina cualquier marca de tiempo, referencia a la fuente o metadatos, de
+      modo que el resultado sea texto limpio listo para copiar. Realiza una
+      limpieza profunda de muletillas, titubeos y repeticiones propias del
+      lenguaje oral (como "¿de acuerdo?", "¿no?", "pues", "vale", "bueno", "ok")
+      sin resumir ninguna sección. Mantén el orden de las partes y la totalidad
+      del contenido educativo; el resultado debe ser profesional, gramaticalmente
+      correcto y listo para copiar.
+    temperature: 0.3
+    max_tokens: 8000
+

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "learning-session-transcriber"
+version = "0.1.0"
+description = "Learning Session Transcriber"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Your Name", email = "your.email@example.com" }]
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0",
+    "openai>=1.0.0",
+    "pypdf>=5.0.0",
+    "yt-dlp>=2025.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+learning-session-transcriber = "learning_session_transcriber.run_session:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests that may call external services (OpenAI, network, etc.)",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "def __repr__"]
+
