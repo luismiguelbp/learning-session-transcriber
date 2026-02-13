@@ -1,0 +1,14 @@
+index;field;value
+0;content_name;20260211_210000_example_session
+0;topic;Example session - generic topic
+0;language;es
+0;llm_model;gpt-5-mini
+0;main_postprocess_prompts;study_guide
+1;index;1
+1;title;Example Class 1
+1;url;https://example.com/your_video_link_1
+1;postprocess_prompts;summary
+2;index;2
+2;title;Example Class 2
+2;url;https://example.com/your_video_link_2
+2;postprocess_prompts;key_concepts
