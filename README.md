@@ -36,12 +36,16 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
 
 1. **Create and activate a virtual environment**
 
+   Unix/macOS:
    ```bash
-   python -m venv .venv
-   # macOS / Linux
+   python3 -m venv .venv
    source .venv/bin/activate
-   # Windows (PowerShell)
-   .venv\Scripts\Activate.ps1
+   ```
+
+   Windows:
+   ```bash
+   py -m venv .venv
+   .venv\Scripts\activate
    ```
 
 2. **Install dependencies**
@@ -83,9 +87,9 @@ Where `content_name` follows the pattern:
 
 **Example:**
 
-- `content_name: YYYYMMDD_HHmmss_session-topic`
+- Content name: `YYYYMMDD_HHmmss_session-topic`
 - Folder: `sessions/YYYYMMDD_HHmmss_session-topic/`
-- Config file: `sessions/YYYYMMDD_HHmmss_session-topic/session.yaml` or `session.csv`
+- Config file: `sessions/YYYYMMDD_HHmmss_session-topic/session.yaml` or `sessions/YYYYMMDD_HHmmss_session-topic/session.csv`
 
 ### YAML Format
 
