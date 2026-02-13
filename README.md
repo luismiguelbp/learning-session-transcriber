@@ -18,6 +18,7 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
   - `synthesizer.py` – builds the combined main document from per-video transcripts.
   - `prompts.py` – applies per-video and main-document prompts defined in `prompts.yaml`.
   - `manifest.py` – manages `manifest.json` tracking all generated artifacts.
+  - `audio_joiner.py` – standalone module to convert WAV to MP3 and join session audio with silence gaps and ID3 metadata.
 - `tests/` – pytest tests
   - `test_config.py` – unit tests for `Config.from_env`.
   - `test_downloader.py` – offline test for the downloader.
@@ -36,12 +37,16 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
 
 1. **Create and activate a virtual environment**
 
+   Unix/macOS:
    ```bash
-   python -m venv .venv
-   # macOS / Linux
+   python3 -m venv .venv
    source .venv/bin/activate
-   # Windows (PowerShell)
-   .venv\Scripts\Activate.ps1
+   ```
+
+   Windows:
+   ```bash
+   py -m venv .venv
+   .venv\Scripts\activate
    ```
 
 2. **Install dependencies**
@@ -83,9 +88,9 @@ Where `content_name` follows the pattern:
 
 **Example:**
 
-- `content_name: YYYYMMDD_HHmmss_session-topic`
+- Content name: `YYYYMMDD_HHmmss_session-topic`
 - Folder: `sessions/YYYYMMDD_HHmmss_session-topic/`
-- Config file: `sessions/YYYYMMDD_HHmmss_session-topic/session.yaml` or `session.csv`
+- Config file: `sessions/YYYYMMDD_HHmmss_session-topic/session.yaml` or `sessions/YYYYMMDD_HHmmss_session-topic/session.csv`
 
 ### YAML Format
 
@@ -230,11 +235,40 @@ Steps can be selectively enabled/disabled via command-line arguments; see the mo
 
 ---
 
+## Audio joiner (standalone)
+
+The **audio joiner** is a separate module for folders that contain only audio files (WAV or MP3). It does not use `session.yaml`; it uses its own `audio_metadata.yaml` in the session folder.
+
+**Use case:** You have a folder of numbered WAV (or MP3) files and want to convert WAVs to MP3, then join all MP3s into a single file with a configurable silence gap between segments and ID3v1 metadata.
+
+1. Create a folder under `sessions/` (e.g. `sessions/MyAudioSession/`).
+2. Put your WAV and/or MP3 files in that folder (any names; they are processed in alphabetical order).
+3. Copy `audio_metadata.example.yaml` into the folder as `audio_metadata.yaml` and edit:
+   - `silence_gap_seconds` – seconds of silence between each segment.
+   - `output_filename` – name of the final joined file (see template variables below).
+   - `per_file` – ID3v1 tags applied to each individual MP3 when converting WAV to MP3.
+   - `joined` – ID3v1 tags applied to the final joined MP3.
+
+   **Template variables** (resolved at runtime via Python `str.format()`):
+   - **per_file** section: `{index}` (1-based position), `{filename}` (original filename without extension), `{session_name}` (folder name).
+   - **joined** section and **output_filename**: `{session_name}` (folder name), `{total_files}` (number of audio files).
+
+4. Run:
+
+```bash
+python -m learning_session_transcriber.audio_joiner --session sessions/MyAudioSession/
+```
+
+Output is written to `outputs/MyAudioSession/`: converted/copied per-file MP3s and one joined MP3. Requires `ffmpeg` on your PATH.
+
+---
+
 ## Repository and generated data
 
 - The `sessions/` and `outputs/` directories are treated as **user data** (per-session configs and generated artifacts) and are ignored by git via `.gitignore`.
 - The canonical configuration and documentation files tracked in the repository are:
   - `session.example.yaml` – template for new session configs.
+  - `audio_metadata.example.yaml` – template for audio joiner metadata (ID3 and silence gap).
   - `env.example` – template for environment variables.
   - `prompts.yaml` – shared prompt definitions.
   - `README.md` – this documentation.

@@ -209,3 +209,6 @@ __marimo__/
 # Project-specific generated content
 outputs/
 sessions/
+
+# macOS
+.DS_Store
