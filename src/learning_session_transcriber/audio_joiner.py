@@ -1,8 +1,8 @@
-"""Audio joiner: convert WAV to MP3, join MP3s with silence gaps and ID3 metadata.
+"""Audio joiner: convert WAV/M4A to MP3, join MP3s with silence gaps and ID3 metadata.
 
 Invoked via: python -m learning_session_transcriber.audio_joiner --session sessions/<name>/
 
-Reads audio_metadata.yaml from the session folder. Converts WAV files to MP3,
+Reads audio_metadata.yaml from the session folder. Converts WAV and M4A files to MP3,
 optionally applies per-file ID3 metadata, then joins all MP3s into one file
 with configurable silence between segments and joined ID3 metadata.
 """
@@ -94,12 +94,12 @@ def _safe_format_map(template: str, variables: dict[str, Any]) -> str:
 
 
 def scan_audio_files(session_dir: Path) -> list[Path]:
-    """Find all .wav and .mp3 files in session_dir, sorted alphabetically."""
+    """Find all .wav, .m4a and .mp3 files in session_dir, sorted alphabetically."""
     paths = []
     for p in session_dir.iterdir():
         if not p.is_file():
             continue
-        if p.suffix.lower() in (".wav", ".mp3"):
+        if p.suffix.lower() in (".wav", ".m4a", ".mp3"):
             paths.append(p)
     return sorted(paths, key=lambda p: p.name.lower())
 
@@ -115,20 +115,22 @@ def _build_ffmpeg_metadata_args(metadata: dict[str, Any]) -> list[str]:
     return args
 
 
-def convert_wav_to_mp3(wav_path: Path, output_path: Path, metadata: dict[str, Any] | None) -> None:
-    """Convert a single WAV to MP3 using ffmpeg; optionally apply ID3 metadata.
+def convert_to_mp3(
+    source_path: Path, output_path: Path, metadata: dict[str, Any] | None
+) -> None:
+    """Convert a single WAV or M4A file to MP3 using ffmpeg; optionally apply ID3 metadata.
 
     Skips if output_path already exists.
     """
     if output_path.is_file():
         logger.info("Skipping conversion, output exists: %s", output_path)
         return
-    logger.info("Converting %s -> %s", wav_path, output_path)
+    logger.info("Converting %s -> %s", source_path, output_path)
     cmd = [
         "ffmpeg",
         "-y",
         "-i",
-        str(wav_path),
+        str(source_path),
         "-acodec",
         "libmp3lame",
         "-q:a",
@@ -140,7 +142,7 @@ def convert_wav_to_mp3(wav_path: Path, output_path: Path, metadata: dict[str, An
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0 or not output_path.is_file():
         raise RuntimeError(
-            f"ffmpeg failed to convert {wav_path} to {output_path} (exit code {result.returncode})"
+            f"ffmpeg failed to convert {source_path} to {output_path} (exit code {result.returncode})"
         )
 
 
@@ -149,7 +151,7 @@ def prepare_audio_files(
     output_dir: Path,
     meta: dict[str, Any],
 ) -> list[Path]:
-    """Convert WAVs to MP3 and copy existing MP3s to output_dir; return ordered MP3 paths.
+    """Convert WAV/M4A to MP3 and copy existing MP3s to output_dir; return ordered MP3 paths.
 
     meta must contain at least the loaded config; per_file metadata is resolved
     per file with index, filename, session_name.
@@ -162,14 +164,14 @@ def prepare_audio_files(
     for index, src in enumerate(files, start=1):
         filename_stem = src.stem
         dest = output_dir / f"{filename_stem}.mp3"
-        if src.suffix.lower() == ".wav":
+        if src.suffix.lower() in (".wav", ".m4a"):
             variables = {
                 "index": index,
                 "filename": filename_stem,
                 "session_name": session_name,
             }
             per_file_resolved = resolve_metadata_variables(per_file_template, variables)
-            convert_wav_to_mp3(src, dest, per_file_resolved if per_file_resolved else None)
+            convert_to_mp3(src, dest, per_file_resolved if per_file_resolved else None)
         else:
             if not dest.is_file() or dest.stat().st_mtime < src.stat().st_mtime:
                 logger.info("Copying %s -> %s", src, dest)
@@ -233,7 +235,8 @@ def join_mp3_files(
             "-f", "concat",
             "-safe", "0",
             "-i", str(concat_path),
-            "-c", "copy",
+            "-acodec", "libmp3lame",
+            "-q:a", "2",
         ]
         if metadata:
             cmd.extend(_build_ffmpeg_metadata_args(metadata))
@@ -266,7 +269,7 @@ def run_audio_joiner(session_dir: Path) -> Path:
 
     files = scan_audio_files(session_dir)
     if not files:
-        raise ValueError(f"No WAV or MP3 files found in {session_dir}")
+        raise ValueError(f"No WAV, M4A or MP3 files found in {session_dir}")
 
     mp3_paths = prepare_audio_files(session_dir, output_dir, meta)
 
@@ -325,7 +328,8 @@ def join_mp3_files_no_silence(
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0",
             "-i", str(concat_path),
-            "-c", "copy",
+            "-acodec", "libmp3lame",
+            "-q:a", "2",
         ]
         if metadata:
             cmd.extend(_build_ffmpeg_metadata_args(metadata))
@@ -343,7 +347,7 @@ def main(args: list[str] | None = None) -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Convert WAV to MP3 and join all session audio files with silence gaps and ID3 metadata."
+        description="Convert WAV/M4A to MP3 and join all session audio files with silence gaps and ID3 metadata."
     )
     parser.add_argument(
         "--session",

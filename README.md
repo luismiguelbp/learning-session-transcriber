@@ -18,7 +18,7 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
   - `synthesizer.py` – builds the combined main document from per-video transcripts.
   - `prompts.py` – applies per-video and main-document prompts defined in `prompts.yaml`.
   - `manifest.py` – manages `manifest.json` tracking all generated artifacts.
-  - `audio_joiner.py` – standalone module to convert WAV to MP3 and join session audio with silence gaps and ID3 metadata.
+  - `audio_joiner.py` – standalone module to convert WAV/M4A to MP3 and join session audio with silence gaps and ID3 metadata.
 - `tests/` – pytest tests
   - `test_config.py` – unit tests for `Config.from_env`.
   - `test_downloader.py` – offline test for the downloader.
@@ -246,7 +246,7 @@ The **audio joiner** is a separate module for folders that contain only audio fi
 3. Copy `audio_metadata.example.yaml` into the folder as `audio_metadata.yaml` and edit:
    - `silence_gap_seconds` – seconds of silence between each segment.
    - `output_filename` – name of the final joined file (see template variables below).
-   - `per_file` – ID3v1 tags applied to each individual MP3 when converting WAV to MP3.
+   - `per_file` – ID3v1 tags applied to each individual MP3 when converting WAV/M4A to MP3.
    - `joined` – ID3v1 tags applied to the final joined MP3.
 
    **Template variables** (resolved at runtime via Python `str.format()`):
