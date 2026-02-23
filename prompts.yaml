@@ -55,7 +55,7 @@ main_document:
     temperature: 0.3
     max_tokens: 1000
 
-  - name: unified_document
+  - name: formated_document
     description: "Single cohesive document, no refs or timestamps, clean prose, ready to copy."
     include_resources: []
     system_prompt: >
