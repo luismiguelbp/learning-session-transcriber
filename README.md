@@ -27,6 +27,7 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
 - `scripts/`
   - `openai_chat_demo.py` – manual script to test OpenAI chat.
   - `openai_audio_transcription_demo.py` – manual script to test audio transcription.
+  - `openai_list_models.py` – manual script to list available OpenAI models.
 - `pyproject.toml` – project metadata and tool config.
 - `requirements.txt` – pinned dependencies (mirrors `pyproject.toml`).
 - `env.example` – example env vars (copy to `.env`).
@@ -294,6 +295,14 @@ You can quickly verify OpenAI connectivity and models using the small scripts in
   ```
 
   Uses `OPENAI_TRANSCRIPTION_MODEL` to transcribe a single file and print the text.
+
+- **List available models**
+
+  ```bash
+  python -m scripts.openai_list_models
+  ```
+
+  Lists all models available for your `OPENAI_API_KEY`, sorted alphabetically.
 
 These scripts are **for manual testing only** and are not part of the automated pytest suite.
 
