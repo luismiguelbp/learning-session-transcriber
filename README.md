@@ -18,7 +18,7 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
   - `synthesizer.py` – builds the combined main document from per-video transcripts.
   - `prompts.py` – applies per-video and main-document prompts defined in `prompts.yaml`.
   - `manifest.py` – manages `manifest.json` tracking all generated artifacts.
-  - `audio_joiner.py` – standalone module to convert WAV to MP3 and join session audio with silence gaps and ID3 metadata.
+  - `audio_joiner.py` – standalone module to convert WAV/M4A to MP3 and join session audio with silence gaps and ID3 metadata.
 - `tests/` – pytest tests
   - `test_config.py` – unit tests for `Config.from_env`.
   - `test_downloader.py` – offline test for the downloader.
@@ -27,6 +27,7 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
 - `scripts/`
   - `openai_chat_demo.py` – manual script to test OpenAI chat.
   - `openai_audio_transcription_demo.py` – manual script to test audio transcription.
+  - `openai_list_models.py` – manual script to list available OpenAI models.
 - `pyproject.toml` – project metadata and tool config.
 - `requirements.txt` – pinned dependencies (mirrors `pyproject.toml`).
 - `env.example` – example env vars (copy to `.env`).
@@ -78,9 +79,9 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
 
 ## Defining a learning session
 
-Each learning session is described in a configuration file (YAML or CSV), typically under:
+Each learning session is described in a YAML configuration file, typically under:
 
-- `sessions/<content_name>/session.yaml` or `sessions/<content_name>/session.csv`
+- `sessions/<content_name>/session.yaml`
 
 Where `content_name` follows the pattern:
 
@@ -90,7 +91,7 @@ Where `content_name` follows the pattern:
 
 - Content name: `YYYYMMDD_HHmmss_session-topic`
 - Folder: `sessions/YYYYMMDD_HHmmss_session-topic/`
-- Config file: `sessions/YYYYMMDD_HHmmss_session-topic/session.yaml` or `sessions/YYYYMMDD_HHmmss_session-topic/session.csv`
+- Config file: `sessions/YYYYMMDD_HHmmss_session-topic/session.yaml`
 
 ### YAML Format
 
@@ -102,20 +103,6 @@ See `session.example.yaml` for a complete, up‑to‑date example including:
 - Optional `postprocess_prompts` per video (a list) to choose one or more per‑video prompts from the prompts file.
 - Optional `main_postprocess_prompts` (a list) to choose one or more main‑document prompts from the prompts file.
 - Optional `include_resources` (key → path, relative to session directory) to attach extra material (e.g. slides, notes) to prompts.
-
-### CSV Format
-
-Alternatively, you can use CSV format with semicolon (`;`) delimiter. See `session.example.csv` for a complete example.
-
-The CSV format uses three columns: `index`, `field`, `value`:
-
-- Rows with `index=0` (or empty) represent session-level metadata (e.g., `content_name`, `topic`, `language`, `llm_model`, `main_postprocess_prompts`).
-- Rows with `index>=1` represent video entries. Each video must include an `index` field, plus fields like `title`, `url`, `local_path`, `postprocess_prompts`.
-
-**Notes:**
-- List fields (`postprocess_prompts`, `main_postprocess_prompts`) can use comma-separated values in the `value` column (e.g., `summary,key_concepts`).
-- Empty `index` values are treated as `0` (session metadata).
-- All fields supported in YAML format are also supported in CSV format.
 
 The `SessionConfig` model in `sessions.py` validates this structure and exposes helper properties such as:
 
@@ -209,18 +196,10 @@ For most use cases you will want to run the whole pipeline for a session with a 
 python -m learning_session_transcriber.run_session --config sessions/<content_name>/session.yaml
 ```
 
-Or with CSV format:
-
-```bash
-python -m learning_session_transcriber.run_session --config sessions/<content_name>/session.csv
-```
-
 Or, after installing the package (e.g. `pip install -e .`), via the console script:
 
 ```bash
 learning-session-transcriber --config sessions/<content_name>/session.yaml
-# or
-learning-session-transcriber --config sessions/<content_name>/session.csv
 ```
 
 This will, in order:
@@ -246,7 +225,7 @@ The **audio joiner** is a separate module for folders that contain only audio fi
 3. Copy `audio_metadata.example.yaml` into the folder as `audio_metadata.yaml` and edit:
    - `silence_gap_seconds` – seconds of silence between each segment.
    - `output_filename` – name of the final joined file (see template variables below).
-   - `per_file` – ID3v1 tags applied to each individual MP3 when converting WAV to MP3.
+   - `per_file` – ID3v1 tags applied to each individual MP3 when converting WAV/M4A to MP3.
    - `joined` – ID3v1 tags applied to the final joined MP3.
 
    **Template variables** (resolved at runtime via Python `str.format()`):
@@ -294,6 +273,14 @@ You can quickly verify OpenAI connectivity and models using the small scripts in
   ```
 
   Uses `OPENAI_TRANSCRIPTION_MODEL` to transcribe a single file and print the text.
+
+- **List available models**
+
+  ```bash
+  python -m scripts.openai_list_models
+  ```
+
+  Lists all models available for your `OPENAI_API_KEY`, sorted alphabetically.
 
 These scripts are **for manual testing only** and are not part of the automated pytest suite.
 

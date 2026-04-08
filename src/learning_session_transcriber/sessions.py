@@ -1,18 +1,17 @@
 """Session configuration models and loader.
 
 A *session* represents one logical set of videos and optional configuration.
-Users create one configuration file (YAML or CSV) per session, typically placed under
-``sessions/<content_name>/session.yaml`` or ``sessions/<content_name>/session.csv``
+Users create one YAML configuration file per session, typically placed under
+``sessions/<content_name>/session.yaml``
 where ``content_name`` follows the pattern::
 
     YYYYMMDD_HHmmss_session-topic
 
-See ``session.example.yaml`` and ``session.example.csv`` for complete examples.
+See ``session.example.yaml`` for a complete example.
 """
 
 from __future__ import annotations
 
-import csv
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -119,103 +118,6 @@ class SessionConfig:
         """Return the list of postprocess prompt names for the main document."""
 
         return self.main_postprocess_prompts or []
-
-
-def _parse_csv_config(config_path: Path) -> dict:
-    """Parse a CSV session configuration file into a dict structure compatible with _validate_and_build.
-    
-    CSV format uses semicolon delimiter with columns: index, field, value
-    - Rows with index=0 (or empty) represent session-level metadata
-    - Rows with index>=1 represent video entries
-    
-    Args:
-        config_path: Path to the CSV file.
-        
-    Returns:
-        Dictionary with the same structure as parsed YAML.
-        
-    Raises:
-        ValueError: If CSV structure is invalid or missing required fields.
-    """
-    with config_path.open("r", encoding="utf-8") as f:
-        reader = csv.DictReader(f, delimiter=";")
-        
-        # Validate CSV structure
-        expected_columns = {"index", "field", "value"}
-        if not expected_columns.issubset(reader.fieldnames or []):
-            raise ValueError(
-                f"CSV file must have columns: index, field, value. "
-                f"Found: {reader.fieldnames}"
-            )
-        
-        # Group rows by index
-        session_data: dict = {}
-        videos_dict: Dict[int, dict] = {}
-        
-        for row in reader:
-            index_str = (row.get("index") or "").strip()
-            field = (row.get("field") or "").strip()
-            value = (row.get("value") or "").strip()
-            
-            if not field:
-                continue  # Skip rows with empty field
-            
-            # Handle empty index as 0 (session metadata)
-            if not index_str:
-                index = 0
-            else:
-                try:
-                    index = int(index_str)
-                except ValueError:
-                    raise ValueError(
-                        f"Invalid index value '{index_str}' in CSV. "
-                        f"Index must be an integer (0 for session metadata, 1+ for videos)."
-                    )
-            
-            # Session metadata (index = 0)
-            if index == 0:
-                # Handle list fields (comma-separated values)
-                if field == "main_postprocess_prompts":
-                    if value:
-                        session_data[field] = [
-                            v.strip() for v in value.split(",") if v.strip()
-                        ]
-                    else:
-                        session_data[field] = []
-                else:
-                    session_data[field] = value
-            
-            # Video entries (index >= 1)
-            else:
-                if index not in videos_dict:
-                    videos_dict[index] = {"index": index}
-                
-                # Ensure index field is always an integer (don't overwrite with string)
-                if field == "index":
-                    try:
-                        videos_dict[index]["index"] = int(value)
-                    except ValueError:
-                        # Keep the original integer index if value is invalid
-                        pass
-                # Handle list fields for videos
-                elif field == "postprocess_prompts":
-                    if value:
-                        videos_dict[index][field] = [
-                            v.strip() for v in value.split(",") if v.strip()
-                        ]
-                    else:
-                        videos_dict[index][field] = []
-                else:
-                    videos_dict[index][field] = value
-        
-        # Convert videos_dict to list
-        videos_list = []
-        for video_index in sorted(videos_dict.keys()):
-            videos_list.append(videos_dict[video_index])
-        
-        session_data["videos"] = videos_list
-        
-        return session_data
 
 
 def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
@@ -348,15 +250,15 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
 
 def load_session_config(config_path: Path) -> SessionConfig:
     """Load and validate a session configuration file from disk.
-    
-    Supports both YAML (``.yaml``, ``.yml``) and CSV (``.csv``) formats.
+
+    Supports YAML (``.yaml``, ``.yml``) format.
 
     ``config_path`` points to the configuration file itself. The caller is responsible
     for keeping track of the *session folder* (``config_path.parent``) when
     resolving relative paths, such as the PDF path.
     
     Args:
-        config_path: Path to the session configuration file (YAML or CSV).
+        config_path: Path to the session configuration file (YAML).
         
     Returns:
         SessionConfig instance.
@@ -369,12 +271,10 @@ def load_session_config(config_path: Path) -> SessionConfig:
     if suffix in (".yaml", ".yml"):
         with config_path.open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
-    elif suffix == ".csv":
-        raw = _parse_csv_config(config_path)
     else:
         raise ValueError(
             f"Unsupported file format: {suffix}. "
-            f"Supported formats: .yaml, .yml, .csv"
+            f"Supported formats: .yaml, .yml"
         )
 
     return _validate_and_build(raw, config_path)

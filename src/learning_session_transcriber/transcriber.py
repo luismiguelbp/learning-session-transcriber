@@ -13,9 +13,7 @@ video index, e.g.::
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -24,18 +22,10 @@ from typing import List, Optional
 from openai import OpenAI
 
 from .config import Config
-from .manifest import add_manifest_file, load_manifest
+from .manifest import add_manifest_file, sync_manifest_with_session
 from .sessions import SessionConfig, load_session_config
 
 logger = logging.getLogger(__name__)
-
-
-def _load_manifest(path: Path) -> list[dict]:
-    if not path.is_file():
-        raise FileNotFoundError(f"manifest.json not found at {path}")
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
 
 def _get_client() -> OpenAI:
     cfg = Config.from_env()
@@ -109,20 +99,15 @@ def transcribe_videos(config_path: Path, client: Optional[OpenAI] = None) -> Non
     transcripts_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_path = session.outputs_root / "manifest.json"
-    manifest_entries = _load_manifest(manifest_path)
+    manifest = sync_manifest_with_session(manifest_path, session)
+    manifest_entries = manifest["videos"]
 
     if client is None:
         client = _get_client()
     model = _get_transcription_model()
 
     for entry in manifest_entries:
-        # Only process entries that represent videos (must have an 'index' field).
-        if "index" not in entry:
-            logger.debug("Skipping non-video manifest entry without index: %r", entry)
-            continue
-
         index = int(entry["index"])
-        title = entry["title"]
 
         # Prefer extracted audio if available; fall back to the original output_path.
         audio_str = entry.get("audio_path") or entry.get("output_path")
@@ -184,7 +169,7 @@ def main(args: List[str] | None = None) -> None:  # pragma: no cover - thin wrap
     parser.add_argument(
         "--config",
         required=True,
-        help="Path to session.yaml file.",
+        help="Path to session YAML config file.",
     )
     parsed = parser.parse_args(args=args)
     transcribe_videos(Path(parsed.config))

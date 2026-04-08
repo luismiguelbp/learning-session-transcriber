@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
@@ -16,7 +15,7 @@ import yaml
 from openai import OpenAI
 
 from .config import Config
-from .manifest import add_manifest_file
+from .manifest import add_manifest_file, load_manifest, sync_manifest_with_session
 from .sessions import SessionConfig, load_session_config
 
 logger = logging.getLogger(__name__)
@@ -164,6 +163,7 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
     cfg = Config.from_env()
     client = _get_client()
     model = cfg.openai_model or session.llm_model
+    manifest_path = session.outputs_root / "manifest.json"
 
     # Use session.prompts_path if set, otherwise use passed prompts_path or default
     if session.prompts_path is not None and session.prompts_path.is_file():
@@ -177,29 +177,30 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
 
     prompts_dir = session.prompts_output_dir
     prompts_dir.mkdir(parents=True, exist_ok=True)
+    manifest = sync_manifest_with_session(manifest_path, session)
 
     # Per‑video prompts.
-    transcript_files = sorted(session.transcripts_output_dir.glob("*_transcript.md"))
-    for transcript_file in transcript_files:
-        raw_content = _read_text(transcript_file)
-        content = _strip_transcript_header(raw_content)
-
-        # Derive index from filename pattern: <content_name>_index_<N>_transcript.md
-        name = transcript_file.stem
-        # Look for "_index_" pattern and extract the number after it
-        index = 0
-        if "_index_" in name:
-            try:
-                parts = name.split("_index_")
-                if len(parts) > 1:
-                    index_str = parts[1].split("_")[0]
-                    index = int(index_str)
-            except (ValueError, IndexError):
-                index = 0
-
-        prompt_names = session.get_video_postprocess_prompts(index)
+    for entry in manifest["videos"]:
+        index = int(entry["index"])
+        prompt_names = list(entry.get("requested_prompts") or [])
         if not prompt_names:
             continue
+
+        transcript_str = entry.get("transcript_path")
+        if not transcript_str:
+            raise FileNotFoundError(
+                f"Manifest is missing transcript_path for video {index}. "
+                "Run the transcription step first."
+            )
+
+        transcript_file = Path(transcript_str)
+        if not transcript_file.is_file():
+            raise FileNotFoundError(
+                f"Transcript listed in manifest for video {index} not found: {transcript_file}"
+            )
+
+        raw_content = _read_text(transcript_file)
+        content = _strip_transcript_header(raw_content)
 
         for prompt in per_video_cfg:
             prompt_name = prompt["name"]
@@ -217,7 +218,13 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
                     "Skipping per‑video prompt %s for video %d: output already exists at %s",
                     prompt_name, index, out_path
                 )
-                add_manifest_file(session.outputs_root / "manifest.json", "prompt", out_path, index)
+                add_manifest_file(
+                    manifest_path,
+                    "prompt",
+                    out_path,
+                    index,
+                    prompt_name=prompt_name,
+                )
                 continue
 
             include_resources_raw = prompt.get("include_resources")
@@ -256,16 +263,29 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
             with out_path.open("w", encoding="utf-8") as f:
                 f.write(answer)
             
-            add_manifest_file(session.outputs_root / "manifest.json", "prompt", out_path, index)
+            add_manifest_file(
+                manifest_path,
+                "prompt",
+                out_path,
+                index,
+                prompt_name=prompt_name,
+            )
 
     # Main‑document prompts.
-    main_prompt_names = session.get_main_postprocess_prompts()
+    manifest = load_manifest(manifest_path)
+    main_prompt_names = list(manifest["session"].get("requested_main_prompts") or [])
     if not main_prompt_names:
         return
 
-    main_doc_path = session.main_markdown_path
+    main_doc_str = manifest["session"].get("main_doc_path")
+    if not main_doc_str:
+        raise FileNotFoundError(
+            "Manifest is missing main_doc_path. Run the synthesis step first."
+        )
+
+    main_doc_path = Path(main_doc_str)
     if not main_doc_path.is_file():
-        raise FileNotFoundError(f"Main document not found at {main_doc_path}")
+        raise FileNotFoundError(f"Main document listed in manifest not found at {main_doc_path}")
 
     main_content = _read_text(main_doc_path)
     for prompt in main_cfg:
@@ -286,7 +306,12 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
                 "Skipping main‑document prompt %s: output already exists at %s",
                 prompt_name, out_path
             )
-            add_manifest_file(session.outputs_root / "manifest.json", "prompt", out_path)
+            add_manifest_file(
+                manifest_path,
+                "prompt",
+                out_path,
+                prompt_name=prompt_name,
+            )
             continue
 
         include_resources_raw = prompt.get("include_resources")
@@ -323,7 +348,12 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
         with out_path.open("w", encoding="utf-8") as f:
             f.write(answer)
         
-        add_manifest_file(session.outputs_root / "manifest.json", "prompt", out_path)
+        add_manifest_file(
+            manifest_path,
+            "prompt",
+            out_path,
+            prompt_name=prompt_name,
+        )
 
 
 def main(args: List[str] | None = None) -> None:  # pragma: no cover - thin wrapper
@@ -335,7 +365,7 @@ def main(args: List[str] | None = None) -> None:  # pragma: no cover - thin wrap
     parser.add_argument(
         "--config",
         required=True,
-        help="Path to session.yaml file.",
+        help="Path to session YAML config file.",
     )
     parser.add_argument(
         "--prompts",

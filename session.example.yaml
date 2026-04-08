@@ -22,14 +22,14 @@ llm_model: "gpt-5-mini"  # optional default model for prompts
 # Names must match entries defined in prompts.yaml.
 # For example:
 # - per_video:       summary, key_concepts, clean_transcript
-# - main_document:   study_guide, executive_summary, unified_document
+# - main_document:   study_guide, executive_summary, formated_document
 #
 # You can configure one or multiple prompts for the main document:
 #
 # main_postprocess_prompts:
 #   - "study_guide"
 #   - "executive_summary"
-#   - "unified_document"
+#   - "formated_document"
 #
 # In this example we only use one:
 main_postprocess_prompts:

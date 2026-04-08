@@ -64,9 +64,12 @@ def test_download_videos_uses_url_and_writes_file(
 
     assert manifest_path.is_file()
     manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert len(manifest_data) == 1
+    assert manifest_data["schema_version"] == 1
+    assert manifest_data["session"]["content_name"] == run_id
+    assert manifest_data["session"]["topic"] == "Test Topic"
+    assert manifest_data["videos"][0]["requested_prompts"] == []
 
-    entry = manifest_data[0]
+    entry = manifest_data["videos"][0]
     output_path = Path(entry["output_path"])
     assert output_path.is_file()
     assert output_path.read_bytes() == b"dummy video data"
