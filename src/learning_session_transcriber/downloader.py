@@ -16,14 +16,13 @@ with the resolved paths for later steps.
 
 from __future__ import annotations
 
-import json
 import logging
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
-from .manifest import add_manifest_file, load_manifest, save_manifest
+from .manifest import sync_manifest_with_session, update_manifest_entry
 from .sessions import SessionConfig, VideoConfig, load_session_config
 
 logger = logging.getLogger(__name__)
@@ -101,7 +100,7 @@ def download_videos(config_path: Path) -> Path:
     _ensure_dir(videos_dir)
 
     manifest_path = session.outputs_root / "manifest.json"
-    manifest_entries = load_manifest(manifest_path)
+    sync_manifest_with_session(manifest_path, session)
 
     for video in session.videos:
         filename = _build_video_filename(session, video)
@@ -138,36 +137,19 @@ def download_videos(config_path: Path) -> Path:
             else:
                 logger.info("Audio file already exists: %s", audio_path)
 
-        # Update manifest entry with all metadata
-        entry_idx = None
-        for idx, entry in enumerate(manifest_entries):
-            if entry.get("index") == video.index:
-                entry_idx = idx
-                break
-        
-        if entry_idx is not None:
-            manifest_entries[entry_idx].update({
+        update_manifest_entry(
+            manifest_path,
+            video.index,
+            {
                 "title": video.title,
                 "url": video.url or "",
                 "local_source": video.local_path or "",
+                "requested_prompts": list(video.postprocess_prompts or []),
                 "output_path": str(target),
                 "audio_path": str(audio_path),
-            })
-        else:
-            manifest_entries.append(
-                {
-                    "index": video.index,
-                    "title": video.title,
-                    "url": video.url or "",
-                    "local_source": video.local_path or "",
-                    "output_path": str(target),
-                    "audio_path": str(audio_path),
-                }
-            )
+            },
+        )
 
-    # Sort by index and save final manifest
-    manifest_entries.sort(key=lambda e: e.get("index", 0))
-    save_manifest(manifest_path, manifest_entries)
     return manifest_path
 
 

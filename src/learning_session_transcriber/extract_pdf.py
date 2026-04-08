@@ -13,7 +13,7 @@ from typing import List
 
 from pypdf import PdfReader
 
-from .manifest import add_manifest_file
+from .manifest import add_manifest_file, sync_manifest_with_session
 from .sessions import SessionConfig, load_session_config
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,8 @@ def extract_pdf_text(config_path: Path) -> Path:
 
     session: SessionConfig = load_session_config(config_path)
     session_dir = config_path.parent
+    manifest_path = session.outputs_root / "manifest.json"
+    sync_manifest_with_session(manifest_path, session)
 
     if session.pdf is None:
         raise ValueError(
@@ -46,7 +48,7 @@ def extract_pdf_text(config_path: Path) -> Path:
     # Check if PDF text already exists - skip if it does
     if text_path.is_file():
         logger.info("Skipping PDF extraction: text file already exists at %s", text_path)
-        add_manifest_file(session.outputs_root / "manifest.json", "pdf", text_path)
+        add_manifest_file(manifest_path, "pdf", text_path)
         return text_path
 
     logger.info("Extracting text from PDF %s -> %s", pdf_source, text_path)
@@ -59,7 +61,7 @@ def extract_pdf_text(config_path: Path) -> Path:
         f.write("\n\n".join(parts))
 
     logger.info("Wrote extracted PDF text to %s", text_path)
-    add_manifest_file(session.outputs_root / "manifest.json", "pdf", text_path)
+    add_manifest_file(manifest_path, "pdf", text_path)
     return text_path
 
 

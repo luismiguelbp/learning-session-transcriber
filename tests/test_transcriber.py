@@ -81,4 +81,9 @@ def test_transcribe_videos_with_openai_api(tmp_path: Path, monkeypatch: pytest.M
     content = files[0].read_text(encoding="utf-8")
     assert content.strip(), "Transcript file should not be empty"
 
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest_data["schema_version"] == 1
+    assert manifest_data["session"]["content_name"] == run_id
+    assert manifest_data["videos"][0]["transcript_path"]
+
 
