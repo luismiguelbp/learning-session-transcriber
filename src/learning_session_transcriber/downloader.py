@@ -178,7 +178,7 @@ def main(args: List[str] | None = None) -> None:  # pragma: no cover - thin wrap
     parser.add_argument(
         "--config",
         required=True,
-        help="Path to session.yaml file.",
+        help="Path to session YAML config file.",
     )
     parsed = parser.parse_args(args=args)
     download_videos(Path(parsed.config))

@@ -93,7 +93,7 @@ def main(args: List[str] | None = None) -> None:  # pragma: no cover - thin wrap
     parser.add_argument(
         "--config",
         required=True,
-        help="Path to session.yaml file.",
+        help="Path to session YAML config file.",
     )
     parsed = parser.parse_args(args=args)
     build_main_document(Path(parsed.config))
