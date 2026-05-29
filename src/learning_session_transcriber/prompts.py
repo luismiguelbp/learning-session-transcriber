@@ -111,7 +111,8 @@ def _resolve_include_resources(
     """Build extra user content from session include_resources for requested keys.
 
     Paths in session.include_resources are relative to the session directory
-    (config_path.parent). Missing files are skipped with a warning.
+    (config_path.parent). Missing or unreadable configured resources raise
+    an exception to stop execution.
     Returns (text_extra, file_parts). When file_parts is non-empty, a
     vision-capable model (e.g. gpt-4o, gpt-5) is required for the request.
     """
@@ -131,12 +132,11 @@ def _resolve_include_resources(
             continue
         path = (session_dir / session.include_resources[key]).resolve()
         if not path.is_file():
-            logger.warning(
-                "include_resources %r path %s does not exist or is not a file; skipping.",
-                key,
-                path,
+            raise ValueError(
+                "include_resources key "
+                f"{key!r} points to a missing or non-file path: {session.include_resources[key]!r} "
+                f"(resolved to {path})"
             )
-            continue
         try:
             if path.suffix.lower() == ".pdf":
                 data = path.read_bytes()
@@ -152,7 +152,11 @@ def _resolve_include_resources(
                 text = _read_text(path)
                 text_parts.append(f"\n\n## Resource: {key}\n\n{text}")
         except OSError as e:
-            logger.warning("Failed to read include_resources %r from %s: %s", key, path, e)
+            raise ValueError(
+                "include_resources key "
+                f"{key!r} points to an unreadable file: {session.include_resources[key]!r} "
+                f"(resolved to {path})"
+            ) from e
     return "".join(text_parts), file_parts
 
 
@@ -161,8 +165,8 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
 
     session: SessionConfig = load_session_config(config_path)
     cfg = Config.from_env()
-    client = _get_client()
     model = cfg.openai_model or session.llm_model
+    client: OpenAI | None = None
     manifest_path = session.outputs_root / "manifest.json"
 
     # Use session.prompts_path if set, otherwise use passed prompts_path or default
@@ -181,6 +185,9 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
 
     # Per‑video prompts.
     for entry in manifest["videos"]:
+        if bool(entry.get("download_only")):
+            continue
+
         index = int(entry["index"])
         prompt_names = list(entry.get("requested_prompts") or [])
         if not prompt_names:
@@ -241,6 +248,8 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
             logger.info(
                 "Running per‑video prompt %s on transcript %s", prompt_name, transcript_file
             )
+            if client is None:
+                client = _get_client()
             answer = _chat(
                 client=client,
                 model=model,
@@ -326,6 +335,8 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
             user_content = [{"type": "text", "text": main_content + text_extra}] + file_parts
 
         logger.info("Running main‑document prompt %s", prompt_name)
+        if client is None:
+            client = _get_client()
         answer = _chat(
             client=client,
             model=model,

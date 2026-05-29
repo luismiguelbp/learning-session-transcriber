@@ -100,7 +100,13 @@ def transcribe_videos(config_path: Path, client: Optional[OpenAI] = None) -> Non
 
     manifest_path = session.outputs_root / "manifest.json"
     manifest = sync_manifest_with_session(manifest_path, session)
-    manifest_entries = manifest["videos"]
+    manifest_entries = [
+        entry for entry in manifest["videos"] if not bool(entry.get("download_only"))
+    ]
+
+    if not manifest_entries:
+        logger.info("Skipping transcription: no transcribable videos in manifest.")
+        return
 
     if client is None:
         client = _get_client()

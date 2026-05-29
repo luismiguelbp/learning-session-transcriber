@@ -100,9 +100,11 @@ See `session.example.yaml` for a complete, up‑to‑date example including:
 - Basic fields (`content_name`, `topic`, `language`, `llm_model`).
 - Optional `prompts_file` (path relative to session directory) to specify which prompts YAML file to use; if omitted, defaults to `prompts.yaml` at project root.
 - `videos` list with `index`, `title`, `url` (and optional `local_path`).
+- Optional `download_only: true` per video to keep a video as download-only (no MP3 extraction, no transcription, no per-video prompts).
 - Optional `postprocess_prompts` per video (a list) to choose one or more per‑video prompts from the prompts file.
 - Optional `main_postprocess_prompts` (a list) to choose one or more main‑document prompts from the prompts file.
 - Optional `include_resources` (key → path, relative to session directory) to attach extra material (e.g. slides, notes) to prompts.
+  - When `include_resources` is configured, each referenced file must exist and be readable in the session folder before execution starts; otherwise the run fails fast with an error.
 
 The `SessionConfig` model in `sessions.py` validates this structure and exposes helper properties such as:
 
@@ -123,8 +125,9 @@ For each video it:
 
 - Writes an `.mp4` file into `outputs/<content_name>/` named:
   - `<content_name>_index_<n>_video.mp4`
-- Extracts an `.mp3` audio file from that video using `ffmpeg`, named:
+- If `download_only` is not enabled, extracts an `.mp3` audio file from that video using `ffmpeg`, named:
   - `<content_name>_index_<n>_audio.mp3`
+- If `download_only: true`, skips MP3 extraction and keeps only the `.mp4`.
 - Records both paths in a `manifest.json` at `outputs/<content_name>/manifest.json`:
   - `output_path` – path to the `.mp4` video.
   - `audio_path` – path to the extracted `.mp3` audio (preferred for transcription).
@@ -141,6 +144,7 @@ The transcriber:
 
 - Loads the same `session.yaml`.
 - Reads `manifest.json` produced by the downloader.
+- Skips videos marked as `download_only`.
 - For each entry, prefers the extracted `.mp3` in `audio_path` (falling back to `output_path`).
 - Splits long audio files into sequential chunks using `ffmpeg` so they respect the model’s
   maximum duration per request.
@@ -205,10 +209,10 @@ learning-session-transcriber --config sessions/<content_name>/session.yaml
 This will, in order:
 
 - Download or copy videos according to your `session.yaml`.
-- Transcribe audio into per-video transcripts.
+- Transcribe audio into per-video transcripts (skipping download-only videos).
 - Optionally extract PDFs if configured.
-- Synthesize a main document from all transcripts.
-- Apply any configured per-video and main-document prompts.
+- Synthesize a main document from transcribed videos.
+- Apply any configured per-video and main-document prompts (download-only videos are ignored for per-video prompts).
 
 Steps can be selectively enabled/disabled via command-line arguments; see the module docstring in `run_session.py` for details.
 

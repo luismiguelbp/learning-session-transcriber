@@ -67,3 +67,11 @@ videos:
   #   # NOTE: local_path is resolved relative to the current working directory,
   #   # not automatically relative to this YAML file.
   #   local_path: "/absolute/or/relative/path/to/Example_Class_1_local.mp4"
+
+  # Example 4: download-only reference video
+  # This downloads/copies the video file but skips audio extraction and transcription.
+  # Do not configure postprocess_prompts when download_only is true.
+  # - index: 4
+  #   title: "Reference material (download only)"
+  #   url: "https://example.com/reference_video_link"
+  #   download_only: true

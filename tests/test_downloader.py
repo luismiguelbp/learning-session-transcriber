@@ -12,7 +12,13 @@ import yaml
 from learning_session_transcriber import downloader
 
 
-def _write_session_yaml(path: Path, content_name: str, url: str) -> None:
+def _write_session_yaml(
+    path: Path,
+    content_name: str,
+    url: str,
+    *,
+    download_only: bool = False,
+) -> None:
     data = {
         "content_name": content_name,
         "topic": "Test Topic",
@@ -21,6 +27,7 @@ def _write_session_yaml(path: Path, content_name: str, url: str) -> None:
                 "index": 1,
                 "title": "Test Class 1",
                 "url": url,
+                "download_only": download_only,
             }
         ],
         "pdf": {"title": "Dummy PDF", "path": "dummy.pdf"},
@@ -77,5 +84,46 @@ def test_download_videos_uses_url_and_writes_file(
     audio_path = Path(entry["audio_path"])
     assert audio_path.is_file()
     assert audio_path.read_bytes() == b"dummy audio data"
+
+
+def test_download_videos_download_only_skips_audio_extraction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_test_download_only"
+    session_dir = tmp_path / "sessions" / run_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    config_path = session_dir / "session.yaml"
+    url = "https://example.com/reference-video"
+    _write_session_yaml(config_path, run_id, url, download_only=True)
+
+    def fake_download(url_arg: str, target_path: Path) -> None:
+        assert url_arg == url
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_bytes(b"dummy video data")
+
+    monkeypatch.setattr(downloader, "_download_with_ytdlp", fake_download)
+
+    def fail_extract_audio(_src: Path, _target_path: Path) -> None:
+        raise AssertionError("_extract_audio should not be called for download-only videos")
+
+    monkeypatch.setattr(downloader, "_extract_audio", fail_extract_audio)
+
+    manifest_path = downloader.download_videos(config_path)
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = manifest_data["videos"][0]
+
+    assert entry["download_only"] is True
+    assert entry["audio_path"] is None
+    assert entry["requested_prompts"] == []
+
+    output_path = Path(entry["output_path"])
+    assert output_path.is_file()
+    assert output_path.read_bytes() == b"dummy video data"
+
+    expected_audio = output_path.with_name(f"{run_id}_index_1_audio.mp3")
+    assert not expected_audio.exists()
 
 

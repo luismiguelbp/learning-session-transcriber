@@ -115,8 +115,45 @@ def download_videos(config_path: Path) -> Path:
         video_exists = target.is_file()
         audio_exists = audio_path.is_file()
 
+        if video.download_only:
+            if not video_exists:
+                if video.local_path:
+                    _copy_local_video(Path(video.local_path), target)
+                elif video.url:
+                    _download_with_ytdlp(video.url, target)
+                else:  # pragma: no cover - already validated
+                    raise ValueError(
+                        f"Video {video.index} has neither 'local_path' nor 'url' defined"
+                    )
+            else:
+                logger.info(
+                    "Skipping download-only video %d: file already exists (%s)",
+                    video.index,
+                    target,
+                )
+
+            update_manifest_entry(
+                manifest_path,
+                video.index,
+                {
+                    "title": video.title,
+                    "url": video.url or "",
+                    "local_source": video.local_path or "",
+                    "download_only": True,
+                    "requested_prompts": [],
+                    "output_path": str(target),
+                    "audio_path": None,
+                },
+            )
+            continue
+
         if video_exists and audio_exists:
-            logger.info("Skipping video %d: files already exist (%s, %s)", video.index, target, audio_path)
+            logger.info(
+                "Skipping video %d: files already exist (%s, %s)",
+                video.index,
+                target,
+                audio_path,
+            )
         else:
             # Download or copy video if needed
             if not video_exists:
@@ -144,6 +181,7 @@ def download_videos(config_path: Path) -> Path:
                 "title": video.title,
                 "url": video.url or "",
                 "local_source": video.local_path or "",
+                "download_only": False,
                 "requested_prompts": list(video.postprocess_prompts or []),
                 "output_path": str(target),
                 "audio_path": str(audio_path),

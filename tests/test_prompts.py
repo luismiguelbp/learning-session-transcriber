@@ -44,6 +44,7 @@ def test_resolve_include_resources_returns_empty_when_keys_empty(tmp_path: Path)
     session_dir.mkdir()
     config_path = session_dir / "session.yaml"
     _write_session_yaml(config_path, "test_run", include_resources={"notes": "material.txt"})
+    (session_dir / "material.txt").write_text("notes", encoding="utf-8")
     session = load_session_config(config_path)
     text_extra, file_parts = _resolve_include_resources(session, config_path, [])
     assert text_extra == ""
@@ -78,16 +79,14 @@ def test_resolve_include_resources_skips_missing_key(tmp_path: Path) -> None:
     assert file_parts == []
 
 
-def test_resolve_include_resources_skips_missing_file(tmp_path: Path) -> None:
-    """When session lists a path that does not exist, skip that resource."""
+def test_session_validate_include_resources_file_must_exist(tmp_path: Path) -> None:
+    """Session raises ValueError when include_resources points to a missing file."""
     session_dir = tmp_path / "session"
     session_dir.mkdir()
     config_path = session_dir / "session.yaml"
     _write_session_yaml(config_path, "test_run", include_resources={"pdf": "missing.pdf"})
-    session = load_session_config(config_path)
-    text_extra, file_parts = _resolve_include_resources(session, config_path, ["pdf"])
-    assert text_extra == ""
-    assert file_parts == []
+    with pytest.raises(ValueError, match="points to missing file"):
+        load_session_config(config_path)
 
 
 def test_resolve_include_resources_pdf_returns_file_part(tmp_path: Path) -> None:

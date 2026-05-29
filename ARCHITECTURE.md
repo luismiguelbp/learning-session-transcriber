@@ -92,6 +92,10 @@ Each video can provide either:
 - `url` for download with `yt-dlp`
 - `local_path` for copying an existing local file
 
+Optional per-video flag:
+
+- `download_only: true` to download/copy only the `.mp4` and skip audio extraction/transcription for that entry
+
 ### 2. Environment configuration
 
 `src/learning_session_transcriber/config.py` loads configuration from OS environment and optional `.env`.
@@ -140,7 +144,7 @@ Responsibilities:
 - For each video:
   - copy `local_path`, or
   - download from `url` using `yt-dlp`
-- Extract MP3 audio from the video using `ffmpeg`
+- Extract MP3 audio from the video using `ffmpeg` unless the entry is `download_only`
 - Create or update `outputs/<content_name>/manifest.json`
 
 Generated files:
@@ -155,6 +159,7 @@ Generated files:
 Responsibilities:
 
 - Read `manifest.json`
+- Skip entries marked as `download_only`
 - Prefer `audio_path` over `output_path`
 - Split long audio into chunks with `ffmpeg`
 - Send each chunk to `client.audio.transcriptions.create(...)`
@@ -241,6 +246,7 @@ The manifest is the shared state between steps. It records where artifacts were 
 Typical data tracked in the manifest:
 
 - video entry metadata by `index`
+- `download_only`
 - `output_path`
 - `audio_path`
 - `transcript_path`

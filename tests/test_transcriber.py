@@ -87,3 +87,40 @@ def test_transcribe_videos_with_openai_api(tmp_path: Path, monkeypatch: pytest.M
     assert manifest_data["videos"][0]["transcript_path"]
 
 
+def test_transcribe_videos_skips_when_all_entries_are_download_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_download_only_transcriber"
+    session_dir = tmp_path / "sessions" / run_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    config_path = session_dir / "session.yaml"
+    data = {
+        "content_name": run_id,
+        "topic": "Download-only session",
+        "language": "es",
+        "videos": [
+            {
+                "index": 1,
+                "title": "Reference video",
+                "url": "https://example.com/video",
+                "download_only": True,
+            }
+        ],
+    }
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    def fail_get_client():
+        raise AssertionError("_get_client should not be called for all-download-only sessions")
+
+    monkeypatch.setattr("learning_session_transcriber.transcriber._get_client", fail_get_client)
+
+    transcribe_videos(config_path)
+
+    outputs_root = tmp_path / "outputs" / run_id
+    transcript_files = list(outputs_root.glob("*_transcript.md"))
+    assert transcript_files == []
+
+

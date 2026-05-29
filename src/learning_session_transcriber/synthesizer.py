@@ -40,9 +40,18 @@ def build_main_document(config_path: Path) -> Path:
     if not video_entries:
         raise FileNotFoundError(f"No video entries found in manifest at {manifest_path}")
 
+    transcribable_entries = [
+        entry for entry in video_entries if not bool(entry.get("download_only"))
+    ]
+    if not transcribable_entries:
+        raise FileNotFoundError(
+            "No transcribable videos found in manifest. "
+            "All entries are marked as download-only."
+        )
+
     transcript_entries: list[dict] = []
     missing_indices: list[str] = []
-    for entry in video_entries:
+    for entry in transcribable_entries:
         transcript_str = entry.get("transcript_path")
         if not transcript_str:
             missing_indices.append(str(entry["index"]))

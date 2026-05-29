@@ -123,6 +123,108 @@ def test_build_main_document_uses_manifest_transcript_paths(tmp_path: Path, monk
     assert "Contenido B" in content
 
 
+def test_build_main_document_ignores_download_only_entries(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    run_id = "20260408_120002_manifest_synth_download_only"
+    session_dir = tmp_path / "sessions" / run_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    config_path = session_dir / "session.yaml"
+
+    data = {
+        "content_name": run_id,
+        "topic": "Manifest Driven Session",
+        "language": "es",
+        "videos": [
+            {
+                "index": 1,
+                "title": "Primera parte",
+                "url": "https://example.com/video-1",
+            },
+            {
+                "index": 2,
+                "title": "Segunda parte",
+                "url": "https://example.com/video-2",
+            },
+            {
+                "index": 3,
+                "title": "Referencia",
+                "url": "https://example.com/video-3",
+                "download_only": True,
+            },
+        ],
+    }
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    outputs_root = tmp_path / "outputs" / run_id
+    outputs_root.mkdir(parents=True, exist_ok=True)
+    first_part = outputs_root / "part-a.md"
+    second_part = outputs_root / "part-b.md"
+    first_part.write_text("Contenido A", encoding="utf-8")
+    second_part.write_text("Contenido B", encoding="utf-8")
+
+    manifest = {
+        "schema_version": 1,
+        "session": {
+            "content_name": run_id,
+            "topic": "Manifest Driven Session",
+            "language": "es",
+            "llm_model": "",
+            "prompts_path": "prompts.yaml",
+            "include_resources": {},
+            "requested_main_prompts": [],
+            "main_doc_path": None,
+            "pdf_path": None,
+            "prompt_outputs": [],
+        },
+        "videos": [
+            {
+                "index": 1,
+                "title": "Primera parte",
+                "url": "https://example.com/video-1",
+                "local_source": "",
+                "download_only": False,
+                "requested_prompts": [],
+                "output_path": None,
+                "audio_path": None,
+                "transcript_path": str(first_part),
+                "prompt_outputs": [],
+            },
+            {
+                "index": 2,
+                "title": "Segunda parte",
+                "url": "https://example.com/video-2",
+                "local_source": "",
+                "download_only": False,
+                "requested_prompts": [],
+                "output_path": None,
+                "audio_path": None,
+                "transcript_path": str(second_part),
+                "prompt_outputs": [],
+            },
+            {
+                "index": 3,
+                "title": "Referencia",
+                "url": "https://example.com/video-3",
+                "local_source": "",
+                "download_only": True,
+                "requested_prompts": [],
+                "output_path": str(outputs_root / f"{run_id}_index_3_video.mp4"),
+                "audio_path": None,
+                "transcript_path": None,
+                "prompt_outputs": [],
+            },
+        ],
+    }
+    (outputs_root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    main_path = build_main_document(config_path)
+    content = main_path.read_text(encoding="utf-8")
+    assert "## Primera parte" in content
+    assert "## Segunda parte" in content
+    assert "## Referencia" not in content
+
+
 def test_apply_prompts_uses_manifest_paths(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
 
@@ -196,3 +298,74 @@ def test_apply_prompts_uses_manifest_paths(tmp_path: Path, monkeypatch) -> None:
     manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest_data["videos"][0]["prompt_outputs"][0]["name"] == "summary"
     assert manifest_data["session"]["prompt_outputs"][0]["name"] == "study_guide"
+
+
+def test_apply_prompts_no_work_does_not_create_client(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    run_id = "20260408_120003_no_prompt_work"
+    session_dir = tmp_path / "sessions" / run_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    config_path = session_dir / "session.yaml"
+
+    data = {
+        "content_name": run_id,
+        "topic": "No prompt work",
+        "language": "es",
+        "videos": [
+            {
+                "index": 1,
+                "title": "Reference video",
+                "url": "https://example.com/video-1",
+                "download_only": True,
+            }
+        ],
+        "main_postprocess_prompts": [],
+    }
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    _write_prompts_yaml(tmp_path / "prompts.yaml")
+
+    outputs_root = tmp_path / "outputs" / run_id
+    outputs_root.mkdir(parents=True, exist_ok=True)
+    manifest_path = outputs_root / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "session": {
+                    "content_name": run_id,
+                    "topic": "No prompt work",
+                    "language": "es",
+                    "llm_model": "",
+                    "prompts_path": "prompts.yaml",
+                    "include_resources": {},
+                    "requested_main_prompts": [],
+                    "main_doc_path": None,
+                    "pdf_path": None,
+                    "prompt_outputs": [],
+                },
+                "videos": [
+                    {
+                        "index": 1,
+                        "title": "Reference video",
+                        "url": "https://example.com/video-1",
+                        "local_source": "",
+                        "download_only": True,
+                        "requested_prompts": [],
+                        "output_path": str(outputs_root / f"{run_id}_index_1_video.mp4"),
+                        "audio_path": None,
+                        "transcript_path": None,
+                        "prompt_outputs": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "learning_session_transcriber.prompts._get_client",
+        lambda: (_ for _ in ()).throw(AssertionError("_get_client should not be called")),
+    )
+
+    apply_prompts(config_path)
