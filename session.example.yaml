@@ -1,7 +1,7 @@
 content_name: 20260211_210000_example_session
 topic: "Example session - generic topic"
 language: "es"           # optional, defaults to "es"
-llm_model: "gpt-5-mini"  # optional default model for prompts
+llm_model: "gpt-6-luna"  # optional model for prompt post-processing
 
 # Optional: which prompts file to use (path relative to this session's directory).
 # If omitted, the default prompts.yaml at project root will be used.
@@ -12,7 +12,7 @@ llm_model: "gpt-5-mini"  # optional default model for prompts
 # prompts in prompts.yaml (e.g. include_resources: [pdf, notes]) are resolved from
 # this map. Paths are relative to the session directory (same folder as this file).
 # Key "pdf" must point to a .pdf file (sent as base64 to the model). Key "notes" must
-# point to a .txt file. Use a vision-capable model (e.g. gpt-4o, gpt-5) when using PDFs.
+# point to a .txt file. Use a vision-capable model (e.g. GPT-6) when using PDFs.
 # Example:
 # include_resources:
 #   pdf: "material.pdf"

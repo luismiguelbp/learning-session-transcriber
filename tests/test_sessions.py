@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from learning_session_transcriber.sessions import load_session_config
+from learning_session_transcriber.config import DEFAULT_OPENAI_MODEL
 
 
 def _write_valid_session(path: Path, content_name: str = "test_session") -> None:
@@ -34,6 +35,7 @@ def test_load_session_config_accepts_yaml(tmp_path: Path) -> None:
     assert session.content_name == "yaml_ok"
     assert len(session.videos) == 1
     assert session.videos[0].index == 1
+    assert session.llm_model == DEFAULT_OPENAI_MODEL
 
 
 def test_load_session_config_accepts_yml(tmp_path: Path) -> None:

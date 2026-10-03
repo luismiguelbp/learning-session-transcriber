@@ -70,10 +70,11 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
    - `APP_ENV` – e.g. `development`, `production`. Defaults to `development`.
    - `LOG_LEVEL` – e.g. `INFO`, `DEBUG`. Defaults to `INFO` (uppercased by code).
    - `OPENAI_API_KEY` – your OpenAI API key.
-   - `OPENAI_MODEL` – chat model (e.g. `gpt-5-mini` by default, or another `gpt-5.x` model).
+   - `OPENAI_MODEL` – optional model override for prompt processing. When unset, the session's `llm_model` is used; new sessions default to `gpt-6-luna`.
+   - `OPENAI_REASONING_EFFORT` – GPT-6 reasoning effort. Defaults to `medium`; supported values are `none`, `low`, `medium`, `high`, `xhigh`, and `max` (model support varies).
    - `OPENAI_TRANSCRIPTION_MODEL` – audio transcription model (e.g. `gpt-4o-transcribe`).
 
-   The `Config` class in `config.py` reads from the OS environment and `.env` (via `python-dotenv`) without overwriting existing OS variables.
+   The `Config` class in `config.py` reads from the OS environment and `.env` (via `python-dotenv`) without overwriting existing OS variables. An explicit `OPENAI_MODEL` takes precedence over the session's `llm_model`; without it, the session setting is used.
 
 ---
 
@@ -268,7 +269,7 @@ You can quickly verify OpenAI connectivity and models using the small scripts in
   python -m scripts.openai_chat_demo
   ```
 
-  Uses `OPENAI_API_KEY` and `OPENAI_MODEL` to send a short prompt (in Spanish) and print the response.
+  Uses `OPENAI_API_KEY` and the configured prompt model to send a short prompt and print the response. GPT-6 models use the Responses API and `OPENAI_REASONING_EFFORT`.
 
 - **Audio transcription demo**
 
@@ -331,7 +332,6 @@ These scripts are **for manual testing only** and are not part of the automated 
 
 - **KISS**: prefer simple, explicit steps and file structures over heavy frameworks.
 - **Layered**: keep configuration, session description, downloading, and transcription separated.
-- **Config via env**: `Config.from_env()` is the single source of truth; no secrets in code.
+- **Config via env and session**: environment variables override session-level model choices; no secrets in code.
 - **Testable**: downloader is testable without network; OpenAI integration is opt‑in and clearly marked.
 - **Scriptable**: small `python -m ...` entry points instead of complex CLIs, so you can compose steps however you like.
-

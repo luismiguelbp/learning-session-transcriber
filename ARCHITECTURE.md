@@ -80,7 +80,7 @@ It defines:
 - `content_name`: session identifier and output filename prefix
 - `topic`: session title used in the main document
 - `language`: transcription language
-- `llm_model`: preferred model for prompt post-processing
+- `llm_model`: default model for prompt post-processing (`gpt-6-luna` when omitted)
 - `videos[]`: ordered source videos
 - `main_postprocess_prompts`: prompt names for the combined document
 - `prompts_file`: optional alternative prompts file
@@ -103,7 +103,8 @@ Optional per-video flag:
 Important values:
 
 - `OPENAI_API_KEY`
-- `OPENAI_MODEL`
+- `OPENAI_MODEL` (optional override; otherwise use the session's `llm_model`)
+- `OPENAI_REASONING_EFFORT` (GPT-6 effort, defaults to `medium`)
 - `OPENAI_TRANSCRIPTION_MODEL`
 - `LOG_LEVEL`
 
@@ -114,7 +115,7 @@ Important values:
 - `per_video`
 - `main_document`
 
-Each prompt declares its `name`, `system_prompt`, `temperature`, `max_tokens`, and optional `include_resources`.
+Each prompt declares its `name`, `system_prompt`, optional `temperature`, `max_tokens`, and optional `include_resources`. GPT-6 requests use the Responses API; they omit `temperature` when reasoning effort is active. `max_tokens` maps to the API output-token cap, which includes reasoning tokens for GPT-6. Non-GPT-6 model overrides continue to use Chat Completions.
 
 ## Pipeline Stages
 
@@ -193,6 +194,7 @@ Generated file:
 Responsibilities:
 
 - Load prompt templates from `prompts.yaml` or a session-specific prompts file
+- Use the Responses API for GPT-6 models, with the configured reasoning effort; preserve Chat Completions for non-GPT-6 model overrides
 - Run selected `per_video` prompts against each transcript
 - Run selected `main_document` prompts against the synthesized main document
 - Optionally attach `include_resources` content

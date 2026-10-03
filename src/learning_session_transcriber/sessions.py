@@ -18,6 +18,8 @@ from typing import Dict, List, Optional
 
 import yaml
 
+from .config import DEFAULT_OPENAI_MODEL
+
 
 @dataclass
 class VideoConfig:
@@ -65,7 +67,7 @@ class SessionConfig:
     # such as the downloader, without configuring a PDF up front.
     pdf: Optional[PdfConfig] = None
     language: str = "es"
-    llm_model: str = "gpt-5-mini"
+    llm_model: str = DEFAULT_OPENAI_MODEL
     # Optional list of main-document postprocess prompt names defined in
     # prompts.yaml under the ``main_document`` section.
     main_postprocess_prompts: Optional[List[str]] = None
@@ -242,7 +244,7 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
         pdf_cfg = PdfConfig(title=pdf_title, path=pdf_path)
 
     language = str(raw.get("language") or "es")
-    llm_model = str(raw.get("llm_model") or "gpt-5-mini")
+    llm_model = str(raw.get("llm_model") or DEFAULT_OPENAI_MODEL)
 
     raw_main_pp = raw.get("main_postprocess_prompts", raw.get("main_postprocess_prompt"))
     if isinstance(raw_main_pp, list):
@@ -333,4 +335,3 @@ def load_session_config(config_path: Path) -> SessionConfig:
         )
 
     return _validate_and_build(raw, config_path)
-

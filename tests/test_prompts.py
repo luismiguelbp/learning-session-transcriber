@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
-from learning_session_transcriber.prompts import _resolve_include_resources
+from learning_session_transcriber.prompts import (
+    _chat,
+    _resolve_include_resources,
+    _resolve_prompt_model,
+)
 from learning_session_transcriber.sessions import load_session_config
 
 
@@ -103,6 +108,128 @@ def test_resolve_include_resources_pdf_returns_file_part(tmp_path: Path) -> None
     assert file_parts[0]["type"] == "file"
     assert file_parts[0]["file"]["filename"] == "material.pdf"
     assert file_parts[0]["file"]["file_data"].startswith("data:application/pdf;base64,")
+
+
+def test_chat_uses_responses_for_gpt6_and_converts_pdf_input() -> None:
+    captured: dict = {}
+    fake_response = SimpleNamespace(status="completed", output_text="study guide")
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return fake_response
+
+    client = SimpleNamespace(responses=SimpleNamespace(create=create))
+    result = _chat(
+        client=client,
+        model="gpt-6-luna",
+        system_prompt="Create a study guide.",
+        user_content=[
+            {"type": "text", "text": "Transcript"},
+            {
+                "type": "file",
+                "file": {
+                    "filename": "slides.pdf",
+                    "file_data": "data:application/pdf;base64,ZmFrZQ==",
+                },
+            },
+        ],
+        temperature=0.3,
+        max_tokens=1200,
+        reasoning_effort="low",
+    )
+
+    assert result == "study guide"
+    assert captured["model"] == "gpt-6-luna"
+    assert captured["instructions"] == "Create a study guide."
+    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["max_output_tokens"] == 1200
+    assert "temperature" not in captured
+    assert captured["input"][0]["content"] == [
+        {"type": "input_text", "text": "Transcript"},
+        {
+            "type": "input_file",
+            "filename": "slides.pdf",
+            "file_data": "data:application/pdf;base64,ZmFrZQ==",
+        },
+    ]
+
+
+def test_resolve_prompt_model_precedence() -> None:
+    assert _resolve_prompt_model("gpt-6.1-sol", "gpt-6-luna") == "gpt-6.1-sol"
+    assert _resolve_prompt_model(None, "gpt-6-sol") == "gpt-6-sol"
+    assert _resolve_prompt_model(None, None) == "gpt-6-luna"
+
+
+def test_chat_allows_temperature_for_gpt6_luna_with_no_reasoning() -> None:
+    captured: dict = {}
+    client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **kwargs: (
+                captured.update(kwargs)
+                or SimpleNamespace(status="completed", output_text="summary")
+            )
+        )
+    )
+
+    result = _chat(
+        client=client,
+        model="gpt-6-luna",
+        system_prompt="Summarize.",
+        user_content="Transcript",
+        temperature=0.3,
+        max_tokens=300,
+        reasoning_effort="none",
+    )
+
+    assert result == "summary"
+    assert captured["reasoning"] == {"effort": "none"}
+    assert captured["temperature"] == 0.3
+
+
+def test_chat_rejects_none_reasoning_for_gpt61_sol() -> None:
+    client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **_: pytest.fail("request should be rejected before API call")
+        )
+    )
+
+    with pytest.raises(ValueError, match="does not support reasoning effort 'none'"):
+        _chat(
+            client=client,
+            model="gpt-6.1-sol",
+            system_prompt="Summarize.",
+            user_content="Transcript",
+            temperature=0.3,
+            max_tokens=300,
+            reasoning_effort="none",
+        )
+
+
+def test_chat_keeps_legacy_chat_completions_for_non_gpt6_override() -> None:
+    captured: dict = {}
+    fake_response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="legacy output"))]
+    )
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return fake_response
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
+    result = _chat(
+        client=client,
+        model="gpt-5-mini",
+        system_prompt="Summarize.",
+        user_content="Transcript",
+        temperature=0.3,
+        max_tokens=500,
+    )
+
+    assert result == "legacy output"
+    assert captured["temperature"] == 0.3
+    assert captured["max_completion_tokens"] == 500
 
 
 def test_resolve_include_resources_multiple_keys(tmp_path: Path) -> None:
