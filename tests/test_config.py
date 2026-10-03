@@ -1,6 +1,9 @@
 """Tests for config module."""
 
+from io import StringIO
+
 import pytest
+from dotenv import load_dotenv
 
 from learning_session_transcriber.config import Config
 
@@ -37,3 +40,14 @@ def test_config_from_env_custom(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.openai_model == "gpt-custom"
     assert config.openai_reasoning_effort == "low"
     assert config.openai_transcription_model == "whisper-custom"
+
+
+def test_config_supports_same_name_os_env_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The .env alias resolves the existing OS OPENAI_API_KEY without replacing it."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    load_dotenv(
+        stream=StringIO("OPENAI_API_KEY=${OPENAI_API_KEY}\n"),
+        override=False,
+    )
+
+    assert Config.from_env().openai_api_key == "test-key"

@@ -75,9 +75,12 @@ Keep those artifacts short and focused on:
 - If changing manifest producers/consumers, run tests that cover both sides.
 - If behavior changes, update `README.md` or `ARCHITECTURE.md` (not both unless needed).
 
-## Custom Skill
+## Custom Skills
 
-For repeated pipeline-maintenance tasks, use:
-- `.agents/skills/session-pipeline-maintenance/SKILL.md`
+- Pipeline edits: `.agents/skills/session-pipeline-maintenance/SKILL.md`
+- Install the project: `.agents/skills/project-install/SKILL.md`
+- Update dependencies: `.agents/skills/project-update/SKILL.md`
+- Test the project: `.agents/skills/project-test/SKILL.md`
+- Run a session: `.agents/skills/session-run/SKILL.md`
 
-If the skill is unavailable, follow this file directly.
+If a skill is unavailable, follow this file directly.

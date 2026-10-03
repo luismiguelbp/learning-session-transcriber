@@ -69,12 +69,12 @@ Everything is file-based and explicit: you describe a session in a `session.yaml
 
    - `APP_ENV` – e.g. `development`, `production`. Defaults to `development`.
    - `LOG_LEVEL` – e.g. `INFO`, `DEBUG`. Defaults to `INFO` (uppercased by code).
-   - `OPENAI_API_KEY` – your OpenAI API key.
+   - `OPENAI_API_KEY` – required. Keep the key in your OS environment; the example `.env` reuses it with `OPENAI_API_KEY=${OPENAI_API_KEY}` rather than storing a copy.
    - `OPENAI_MODEL` – optional model override for prompt processing. When unset, the session's `llm_model` is used; new sessions default to `gpt-6-luna`.
    - `OPENAI_REASONING_EFFORT` – GPT-6 reasoning effort. Defaults to `medium`; supported values are `none`, `low`, `medium`, `high`, `xhigh`, and `max` (model support varies).
    - `OPENAI_TRANSCRIPTION_MODEL` – audio transcription model (e.g. `gpt-4o-transcribe`).
 
-   The `Config` class in `config.py` reads from the OS environment and `.env` (via `python-dotenv`) without overwriting existing OS variables. An explicit `OPENAI_MODEL` takes precedence over the session's `llm_model`; without it, the session setting is used.
+   The `Config` class in `config.py` reads from the OS environment and `.env` (via `python-dotenv`) without overwriting existing OS variables. The `.env` example uses `${OPENAI_API_KEY}` expansion to reference the same-named OS variable. Ensure that variable is set before launching the app. An explicit `OPENAI_MODEL` takes precedence over the session's `llm_model`; without it, the session setting is used.
 
 ---
 
