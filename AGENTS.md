@@ -81,6 +81,7 @@ Keep those artifacts short and focused on:
 - Install the project: `.agents/skills/project-install/SKILL.md`
 - Update dependencies: `.agents/skills/project-update/SKILL.md`
 - Test the project: `.agents/skills/project-test/SKILL.md`
+- Create a session: `.agents/skills/session-create/SKILL.md`
 - Run a session: `.agents/skills/session-run/SKILL.md`
 
 If a skill is unavailable, follow this file directly.
