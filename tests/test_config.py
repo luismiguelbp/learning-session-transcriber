@@ -22,7 +22,7 @@ def test_config_from_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.openai_api_key is None
     assert config.openai_model is None
     assert config.openai_reasoning_effort == "medium"
-    assert config.openai_transcription_model == "gpt-4o-transcribe"
+    assert config.openai_transcription_model == "gpt-transcribe"
 
 
 def test_config_from_env_custom(monkeypatch: pytest.MonkeyPatch) -> None:

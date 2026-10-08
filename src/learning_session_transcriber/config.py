@@ -45,6 +45,6 @@ class Config:
             openai_model=os.getenv("OPENAI_MODEL", "").strip() or None,
             openai_reasoning_effort=reasoning_effort,
             openai_transcription_model=os.getenv(
-                "OPENAI_TRANSCRIPTION_MODEL", "gpt-4o-transcribe"
+                "OPENAI_TRANSCRIPTION_MODEL", "gpt-transcribe"
             ),
         )

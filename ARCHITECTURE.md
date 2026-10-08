@@ -163,7 +163,7 @@ Responsibilities:
 - Skip entries marked as `download_only`
 - Prefer `audio_path` over `output_path`
 - Split long audio into chunks with `ffmpeg`
-- Send each chunk to `client.audio.transcriptions.create(...)`
+- Send each chunk to `client.audio.transcriptions.create(...)`. The default model is `gpt-transcribe`, which receives the session language as `languages` and returns JSON text.
 - Concatenate chunk transcripts
 - Write one Markdown transcript per video
 - Update `manifest.json`

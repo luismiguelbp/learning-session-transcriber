@@ -10,7 +10,9 @@ from datetime import datetime
 import pytest
 import yaml
 
-from learning_session_transcriber.transcriber import transcribe_videos
+from types import SimpleNamespace
+
+from learning_session_transcriber.transcriber import _transcribe_file, transcribe_videos
 
 
 def _write_session_yaml(path: Path, content_name: str) -> None:
@@ -122,5 +124,54 @@ def test_transcribe_videos_skips_when_all_entries_are_download_only(
     outputs_root = tmp_path / "outputs" / run_id
     transcript_files = list(outputs_root.glob("*_transcript.md"))
     assert transcript_files == []
+
+
+def _fake_client(response):
+    captured: dict = {}
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return response
+
+    return SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=create))), captured
+
+
+def test_transcribe_file_uses_languages_for_gpt_transcribe(tmp_path: Path) -> None:
+    audio_path = tmp_path / "clip.mp3"
+    audio_path.write_bytes(b"audio")
+    client, captured = _fake_client(SimpleNamespace(text="hola"))
+
+    text = _transcribe_file(client, "gpt-transcribe", audio_path, "es")
+
+    assert text == "hola"
+    assert captured["model"] == "gpt-transcribe"
+    assert captured["languages"] == ["es"]
+    assert "language" not in captured
+    assert "response_format" not in captured
+
+
+def test_transcribe_file_keeps_language_for_gpt4o_transcribe(tmp_path: Path) -> None:
+    audio_path = tmp_path / "clip.mp3"
+    audio_path.write_bytes(b"audio")
+    client, captured = _fake_client(SimpleNamespace(text="hola"))
+
+    text = _transcribe_file(client, "gpt-4o-transcribe", audio_path, "es")
+
+    assert text == "hola"
+    assert captured["language"] == "es"
+    assert "languages" not in captured
+    assert "response_format" not in captured
+
+
+def test_transcribe_file_requests_plain_text_for_whisper(tmp_path: Path) -> None:
+    audio_path = tmp_path / "clip.mp3"
+    audio_path.write_bytes(b"audio")
+    client, captured = _fake_client("hola")
+
+    text = _transcribe_file(client, "whisper-1", audio_path, "es")
+
+    assert text == "hola"
+    assert captured["language"] == "es"
+    assert captured["response_format"] == "text"
 
 

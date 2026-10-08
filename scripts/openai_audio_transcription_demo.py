@@ -17,6 +17,7 @@ from typing import NoReturn
 from openai import OpenAI
 
 from learning_session_transcriber.config import Config
+from learning_session_transcriber.transcriber import _transcribe_file
 
 
 def main() -> NoReturn:
@@ -39,15 +40,7 @@ def main() -> NoReturn:
     print(f"Using transcription model: {model}")
     print(f"Transcribing file: {audio_path}")
 
-    with audio_path.open("rb") as f:
-        response = client.audio.transcriptions.create(
-            model=model,
-            file=f,
-            response_format="text",
-            language="es",
-        )
-
-    text = str(response)
+    text = _transcribe_file(client, model, audio_path, "es")
 
     print("\n--- Transcripción ---\n")
     print(text.strip())

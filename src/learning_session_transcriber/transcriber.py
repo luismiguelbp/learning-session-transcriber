@@ -81,14 +81,24 @@ def _split_audio_into_chunks(audio_path: Path, max_chunk_seconds: int = 1300) ->
 def _transcribe_file(client: OpenAI, model: str, audio_path: Path, language: str) -> str:
     """Transcribe a single audio file and return the text."""
 
-    with audio_path.open("rb") as f:
-        response = client.audio.transcriptions.create(
-            model=model,
-            file=f,
-            response_format="text",
-            language=language,
-        )
-    return str(response)
+    model_name = model.lower()
+    request: dict = {"model": model, "file": None}
+    # gpt-transcribe takes expected languages as a list and rejects `language`.
+    if model_name.startswith("gpt-transcribe"):
+        request["languages"] = [language]
+    else:
+        request["language"] = language
+    # gpt-4o transcribe models accept only json. whisper-1 still returns plain text.
+    plain_text = model_name.startswith("whisper")
+    if plain_text:
+        request["response_format"] = "text"
+
+    with audio_path.open("rb") as audio_file:
+        request["file"] = audio_file
+        response = client.audio.transcriptions.create(**request)
+    if plain_text:
+        return str(response)
+    return response.text
 
 
 def transcribe_videos(config_path: Path, client: Optional[OpenAI] = None) -> None:
