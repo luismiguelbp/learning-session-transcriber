@@ -80,7 +80,7 @@ It defines:
 - `content_name`: session identifier and output filename prefix
 - `topic`: session title used in the main document
 - `language`: transcription language
-- `llm_model`: preferred model for prompt post-processing
+- `llm_model`: default model for prompt post-processing (`gpt-6-luna` when omitted)
 - `videos[]`: ordered source videos
 - `main_postprocess_prompts`: prompt names for the combined document
 - `prompts_file`: optional alternative prompts file
@@ -92,6 +92,10 @@ Each video can provide either:
 - `url` for download with `yt-dlp`
 - `local_path` for copying an existing local file
 
+Optional per-video flag:
+
+- `download_only: true` to download/copy only the `.mp4` and skip audio extraction/transcription for that entry
+
 ### 2. Environment configuration
 
 `src/learning_session_transcriber/config.py` loads configuration from OS environment and optional `.env`.
@@ -99,7 +103,8 @@ Each video can provide either:
 Important values:
 
 - `OPENAI_API_KEY`
-- `OPENAI_MODEL`
+- `OPENAI_MODEL` (optional override; otherwise use the session's `llm_model`)
+- `OPENAI_REASONING_EFFORT` (GPT-6 effort, defaults to `medium`)
 - `OPENAI_TRANSCRIPTION_MODEL`
 - `LOG_LEVEL`
 
@@ -110,7 +115,7 @@ Important values:
 - `per_video`
 - `main_document`
 
-Each prompt declares its `name`, `system_prompt`, `temperature`, `max_tokens`, and optional `include_resources`.
+Each prompt declares its `name`, `system_prompt`, optional `temperature`, `max_tokens`, and optional `include_resources`. GPT-6 requests use the Responses API; they omit `temperature` when reasoning effort is active. `max_tokens` maps to the API output-token cap, which includes reasoning tokens for GPT-6. Non-GPT-6 model overrides continue to use Chat Completions.
 
 ## Pipeline Stages
 
@@ -140,7 +145,7 @@ Responsibilities:
 - For each video:
   - copy `local_path`, or
   - download from `url` using `yt-dlp`
-- Extract MP3 audio from the video using `ffmpeg`
+- Extract MP3 audio from the video using `ffmpeg` unless the entry is `download_only`
 - Create or update `outputs/<content_name>/manifest.json`
 
 Generated files:
@@ -155,9 +160,10 @@ Generated files:
 Responsibilities:
 
 - Read `manifest.json`
+- Skip entries marked as `download_only`
 - Prefer `audio_path` over `output_path`
 - Split long audio into chunks with `ffmpeg`
-- Send each chunk to `client.audio.transcriptions.create(...)`
+- Send each chunk to `client.audio.transcriptions.create(...)`. The default model is `gpt-transcribe`, which receives the session language as `languages` and returns JSON text.
 - Concatenate chunk transcripts
 - Write one Markdown transcript per video
 - Update `manifest.json`
@@ -188,6 +194,7 @@ Generated file:
 Responsibilities:
 
 - Load prompt templates from `prompts.yaml` or a session-specific prompts file
+- Use the Responses API for GPT-6 models, with the configured reasoning effort; preserve Chat Completions for non-GPT-6 model overrides
 - Run selected `per_video` prompts against each transcript
 - Run selected `main_document` prompts against the synthesized main document
 - Optionally attach `include_resources` content
@@ -241,6 +248,7 @@ The manifest is the shared state between steps. It records where artifacts were 
 Typical data tracked in the manifest:
 
 - video entry metadata by `index`
+- `download_only`
 - `output_path`
 - `audio_path`
 - `transcript_path`

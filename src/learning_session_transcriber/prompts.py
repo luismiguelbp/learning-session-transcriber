@@ -1,7 +1,7 @@
-"""Prompt application step using the OpenAI Chat API.
+"""Prompt application step using OpenAI text-generation APIs.
 
 This module reads ``prompts.yaml`` and applies per‑video and main‑document
-prompts to session outputs.
+prompts to session outputs. GPT-6 models use the Responses API.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Tuple, Union
 import yaml
 from openai import OpenAI
 
-from .config import Config
+from .config import Config, DEFAULT_OPENAI_MODEL
 from .manifest import add_manifest_file, load_manifest, sync_manifest_with_session
 from .sessions import SessionConfig, load_session_config
 
@@ -70,6 +70,39 @@ def _requires_max_completion_tokens(model: str) -> bool:
     )
 
 
+def _resolve_prompt_model(
+    environment_model: str | None,
+    session_model: str | None,
+) -> str:
+    """Resolve the environment override, then the session model, then the default."""
+    return environment_model or session_model or DEFAULT_OPENAI_MODEL
+
+
+def _responses_user_content(
+    user_content: Union[str, List[dict]],
+) -> Union[str, List[dict]]:
+    """Translate the prompt content parts to the Responses API input format."""
+    if isinstance(user_content, str):
+        return user_content
+
+    converted: List[dict] = []
+    for part in user_content:
+        if part.get("type") == "text":
+            converted.append({"type": "input_text", "text": part.get("text", "")})
+        elif part.get("type") == "file":
+            file_part = part.get("file", {})
+            converted.append(
+                {
+                    "type": "input_file",
+                    "filename": file_part["filename"],
+                    "file_data": file_part["file_data"],
+                }
+            )
+        else:
+            raise ValueError(f"Unsupported prompt content part: {part.get('type')!r}")
+    return converted
+
+
 def _chat(
     client: OpenAI,
     model: str,
@@ -77,7 +110,52 @@ def _chat(
     user_content: Union[str, List[dict]],
     temperature: float,
     max_tokens: int,
+    reasoning_effort: str = "medium",
 ) -> str:
+    if model.lower().startswith("gpt-6"):
+        if reasoning_effort == "none" and model.lower().startswith(
+            ("gpt-6.1", "gpt-6-astra")
+        ):
+            raise ValueError(f"{model} does not support reasoning effort 'none'.")
+
+        create_kwargs = {
+            "model": model,
+            "instructions": system_prompt,
+            "input": [
+                {
+                    "role": "user",
+                    "content": _responses_user_content(user_content),
+                }
+            ],
+            "reasoning": {"effort": reasoning_effort},
+            "max_output_tokens": max_tokens,
+        }
+        # GPT-6 only accepts sampling controls with reasoning effort `none`.
+        if reasoning_effort == "none":
+            create_kwargs["temperature"] = temperature
+
+        response = client.responses.create(**create_kwargs)
+        if getattr(response, "status", "completed") != "completed":
+            details = getattr(response, "incomplete_details", None)
+            logger.warning(
+                "Responses API returned status=%s (reason=%s, model=%s)",
+                response.status,
+                getattr(details, "reason", None),
+                model,
+            )
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            output_details = getattr(usage, "output_tokens_details", None)
+            logger.info(
+                "OpenAI usage (model=%s, input_tokens=%s, output_tokens=%s, reasoning_tokens=%s)",
+                model,
+                getattr(usage, "input_tokens", None),
+                getattr(usage, "output_tokens", None),
+                getattr(output_details, "reasoning_tokens", None),
+            )
+        return response.output_text or ""
+
+    # Keep existing model overrides working through Chat Completions.
     create_kwargs = {
         "model": model,
         "messages": [
@@ -111,9 +189,10 @@ def _resolve_include_resources(
     """Build extra user content from session include_resources for requested keys.
 
     Paths in session.include_resources are relative to the session directory
-    (config_path.parent). Missing files are skipped with a warning.
+    (config_path.parent). Missing or unreadable configured resources raise
+    an exception to stop execution.
     Returns (text_extra, file_parts). When file_parts is non-empty, a
-    vision-capable model (e.g. gpt-4o, gpt-5) is required for the request.
+    vision-capable model (e.g. gpt-4o or GPT-6) is required for the request.
     """
     if not include_resources_keys:
         return "", []
@@ -131,12 +210,11 @@ def _resolve_include_resources(
             continue
         path = (session_dir / session.include_resources[key]).resolve()
         if not path.is_file():
-            logger.warning(
-                "include_resources %r path %s does not exist or is not a file; skipping.",
-                key,
-                path,
+            raise ValueError(
+                "include_resources key "
+                f"{key!r} points to a missing or non-file path: {session.include_resources[key]!r} "
+                f"(resolved to {path})"
             )
-            continue
         try:
             if path.suffix.lower() == ".pdf":
                 data = path.read_bytes()
@@ -152,7 +230,11 @@ def _resolve_include_resources(
                 text = _read_text(path)
                 text_parts.append(f"\n\n## Resource: {key}\n\n{text}")
         except OSError as e:
-            logger.warning("Failed to read include_resources %r from %s: %s", key, path, e)
+            raise ValueError(
+                "include_resources key "
+                f"{key!r} points to an unreadable file: {session.include_resources[key]!r} "
+                f"(resolved to {path})"
+            ) from e
     return "".join(text_parts), file_parts
 
 
@@ -161,8 +243,15 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
 
     session: SessionConfig = load_session_config(config_path)
     cfg = Config.from_env()
-    client = _get_client()
-    model = cfg.openai_model or session.llm_model
+    model = _resolve_prompt_model(cfg.openai_model, session.llm_model)
+    logger.info(
+        "Using prompt model %s%s",
+        model,
+        f" with reasoning effort {cfg.openai_reasoning_effort}"
+        if model.lower().startswith("gpt-6")
+        else "",
+    )
+    client: OpenAI | None = None
     manifest_path = session.outputs_root / "manifest.json"
 
     # Use session.prompts_path if set, otherwise use passed prompts_path or default
@@ -181,6 +270,9 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
 
     # Per‑video prompts.
     for entry in manifest["videos"]:
+        if bool(entry.get("download_only")):
+            continue
+
         index = int(entry["index"])
         prompt_names = list(entry.get("requested_prompts") or [])
         if not prompt_names:
@@ -241,6 +333,8 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
             logger.info(
                 "Running per‑video prompt %s on transcript %s", prompt_name, transcript_file
             )
+            if client is None:
+                client = _get_client()
             answer = _chat(
                 client=client,
                 model=model,
@@ -248,6 +342,7 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
                 user_content=user_content,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                reasoning_effort=cfg.openai_reasoning_effort,
             )
             if not answer.strip():
                 logger.warning(
@@ -326,6 +421,8 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
             user_content = [{"type": "text", "text": main_content + text_extra}] + file_parts
 
         logger.info("Running main‑document prompt %s", prompt_name)
+        if client is None:
+            client = _get_client()
         answer = _chat(
             client=client,
             model=model,
@@ -333,6 +430,7 @@ def apply_prompts(config_path: Path, prompts_path: Path | None = None) -> None:
             user_content=user_content,
             temperature=temperature,
             max_tokens=max_tokens,
+            reasoning_effort=cfg.openai_reasoning_effort,
         )
         if not answer.strip():
             logger.warning(
@@ -374,5 +472,3 @@ def main(args: List[str] | None = None) -> None:  # pragma: no cover - thin wrap
     )
     parsed = parser.parse_args(args=args)
     apply_prompts(Path(parsed.config), Path(parsed.prompts))
-
-

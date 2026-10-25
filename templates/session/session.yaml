@@ -1,0 +1,25 @@
+content_name: "<content_name>"
+topic: ""
+language: "es"
+llm_model: "gpt-5.4"
+
+prompts_file: "prompts.yaml"
+
+include_resources:
+  pdf: "<pdf_filename>"
+
+main_postprocess_prompts:
+  - "formated_document"
+
+videos:
+  - index: 1
+    title: ""
+    url: "<url_1>"
+    postprocess_prompts:
+      - "clean_transcript"
+
+  - index: 2
+    title: ""
+    url: "<url_2>"
+    postprocess_prompts:
+      - "clean_transcript"

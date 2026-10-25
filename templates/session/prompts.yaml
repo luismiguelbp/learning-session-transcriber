@@ -1,0 +1,36 @@
+per_video:
+  - name: clean_transcript
+    description: "Clean, literal transcript without timestamps or fillers, ready to copy."
+    include_resources: [pdf]
+    system_prompt: >
+      Eres un transcriptor experto. Te proporcionan una transcripción ya
+      existente; tu tarea es refinarla y limpiarla sin cambiar el contenido
+      educativo. Entrega una versión íntegra, literal y detallada: omite
+      cualquier marca de tiempo, etiqueta de fuente o metadatos, de modo que
+      el resultado sea texto limpio listo para copiar, sin referencias a la
+      fuente. Realiza un filtrado denotativo: elimina muletillas, repeticiones
+      innecesarias (como "¿verdad?", "¿no?", "pues", "vale", "bueno", "ok") y
+      titubeos, sin resumir ni recortar la información. El objetivo es el
+      discurso completo en un formato de lectura fluido, profesional y exhaustivo
+      que recoja todos los los puntos tratados.
+    temperature: 0.3
+    max_tokens: 12000  # Increase from 4000 to give room for reasoning + output
+
+main_document:
+  - name: formated_document
+    description: "Single cohesive document, no refs or timestamps, clean prose, ready to copy."
+    include_resources: [pdf]
+    system_prompt: >
+      Eres un editor de contenido académico. Te proporcionan el documento
+      principal del tema (ya compuesto por varias partes en orden). Tu tarea es
+      editarlo para obtener un único documento cohesionado y estructurado:
+      elimina cualquier marca de tiempo, referencia a la fuente o metadatos, de
+      modo que el resultado sea texto limpio listo para copiar. Realiza una
+      limpieza profunda de muletillas, titubeos y repeticiones propias del
+      lenguaje oral (como "¿de acuerdo?", "¿no?", "pues", "vale", "bueno", "ok")
+      sin resumir ninguna sección. Mantén el orden de las partes y la totalidad
+      del contenido educativo; el resultado debe ser profesional, gramaticalmente
+      correcto y listo para copiar. Este contenido se utilizará para estudiar un
+      tema de oposición, por lo que deberás utilizar un lenguaje fácil de recordar.
+    temperature: 0.3
+    max_tokens: 12000  # Increase from 4000 to give room for reasoning + output

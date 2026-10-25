@@ -18,6 +18,8 @@ from typing import Dict, List, Optional
 
 import yaml
 
+from .config import DEFAULT_OPENAI_MODEL
+
 
 @dataclass
 class VideoConfig:
@@ -27,6 +29,7 @@ class VideoConfig:
     title: str
     url: Optional[str] = None
     local_path: Optional[str] = None
+    download_only: bool = False
     # Optional list of per-video postprocess prompt names defined in
     # prompts.yaml under the ``per_video`` section.
     postprocess_prompts: Optional[List[str]] = None
@@ -64,7 +67,7 @@ class SessionConfig:
     # such as the downloader, without configuring a PDF up front.
     pdf: Optional[PdfConfig] = None
     language: str = "es"
-    llm_model: str = "gpt-5-mini"
+    llm_model: str = DEFAULT_OPENAI_MODEL
     # Optional list of main-document postprocess prompt names defined in
     # prompts.yaml under the ``main_document`` section.
     main_postprocess_prompts: Optional[List[str]] = None
@@ -120,6 +123,48 @@ class SessionConfig:
         return self.main_postprocess_prompts or []
 
 
+def _validate_include_resource_file(key: str, path_str: str, session_dir: Path) -> None:
+    """Validate that an include_resources path resolves to a readable file."""
+    resolved_path = (session_dir / path_str).resolve()
+    if not resolved_path.exists():
+        raise ValueError(
+            f"include_resources key {key!r} points to missing file: {path_str!r} "
+            f"(resolved to {resolved_path})"
+        )
+    if not resolved_path.is_file():
+        raise ValueError(
+            f"include_resources key {key!r} must point to a file: {path_str!r} "
+            f"(resolved to {resolved_path})"
+        )
+    try:
+        # Open in binary mode to validate readability for both text and binary assets.
+        with resolved_path.open("rb"):
+            pass
+    except OSError as exc:  # pragma: no cover - platform-dependent file permission failures
+        raise ValueError(
+            f"include_resources key {key!r} points to unreadable file: {path_str!r} "
+            f"(resolved to {resolved_path})"
+        ) from exc
+
+
+def _parse_download_only(value: object, *, video_index: int) -> bool:
+    """Parse download_only from YAML with explicit, safe coercion."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes"}:
+            return True
+        if lowered in {"false", "0", "no", ""}:
+            return False
+    raise ValueError(
+        f"Video {video_index} has invalid 'download_only' value: {value!r}. "
+        "Expected a boolean."
+    )
+
+
 def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
     """Validate a raw dict from YAML and build a SessionConfig.
     
@@ -165,12 +210,23 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
         else:
             postprocess_prompts = None
 
+        download_only = _parse_download_only(
+            item.get("download_only"),
+            video_index=index,
+        )
+        if download_only and postprocess_prompts:
+            raise ValueError(
+                f"Video {index} cannot define postprocess prompts when "
+                "'download_only' is true"
+            )
+
         videos.append(
             VideoConfig(
                 index=index,
                 title=title,
                 url=str(url) if url else None,
                 local_path=str(local_path) if local_path else None,
+                download_only=download_only,
                 postprocess_prompts=postprocess_prompts,
             )
         )
@@ -188,7 +244,7 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
         pdf_cfg = PdfConfig(title=pdf_title, path=pdf_path)
 
     language = str(raw.get("language") or "es")
-    llm_model = str(raw.get("llm_model") or "gpt-5-mini")
+    llm_model = str(raw.get("llm_model") or DEFAULT_OPENAI_MODEL)
 
     raw_main_pp = raw.get("main_postprocess_prompts", raw.get("main_postprocess_prompt"))
     if isinstance(raw_main_pp, list):
@@ -234,6 +290,7 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
                     raise ValueError(
                         f"include_resources key 'notes' must point to a .txt file; got: {path_str!r}"
                     )
+                _validate_include_resource_file(key, path_str, config_path.parent)
 
     return SessionConfig(
         content_name=str(raw["content_name"]),
@@ -278,4 +335,3 @@ def load_session_config(config_path: Path) -> SessionConfig:
         )
 
     return _validate_and_build(raw, config_path)
-

@@ -41,6 +41,7 @@ def _new_video_entry(index: int) -> Dict[str, Any]:
         "title": "",
         "url": "",
         "local_source": "",
+        "download_only": False,
         "requested_prompts": [],
         "output_path": None,
         "audio_path": None,
@@ -204,6 +205,7 @@ def _normalize_video_entry(raw: Any) -> Dict[str, Any]:
             "title": str(raw.get("title") or ""),
             "url": str(raw.get("url") or ""),
             "local_source": str(raw.get("local_source") or ""),
+            "download_only": bool(raw.get("download_only") is True),
             "requested_prompts": _normalize_str_list(raw.get("requested_prompts")),
             "output_path": _optional_str(raw.get("output_path")),
             "audio_path": _optional_str(raw.get("audio_path")),
@@ -334,6 +336,7 @@ def sync_manifest_with_session(
                 "title": video.title,
                 "url": video.url or "",
                 "local_source": video.local_path or "",
+                "download_only": bool(video.download_only),
                 "requested_prompts": list(video.postprocess_prompts or []),
             }
         )
