@@ -1,6 +1,6 @@
 ---
 name: session-run
-description: Run a learning-session-transcriber session from a session name or a path to a session folder or session.yaml. Use when the user asks to run, execute, resume, or re-run a session, a content_name under sessions/, or the learning session pipeline. Check the session name, video URLs, and PDF before starting.
+description: Run a learning-session-transcriber session from a session name or a path to a session folder or session.yaml. Use when the user asks to run, execute, resume, or re-run a session, a content_name under sessions/, or the learning session pipeline. Stop if a required input is missing. When every requirement is present, start the run without asking for confirmation.
 ---
 
 # Run Session
@@ -37,7 +37,9 @@ Also stop if:
 
 Confirm `ffmpeg` and `yt-dlp` are on `PATH` when the run includes `download`. Transcription and prompts need `OPENAI_API_KEY` in the environment or `.env`. Do not print the key.
 
-Tell the user the content name, steps, and that the run calls OpenAI. Start only after they confirm.
+If any required input, file, prompt, or tool is missing, stop and name what is missing. Do not start the pipeline.
+
+If every requirement is present, start the run. Tell the user the content name, the steps, and that the run calls OpenAI, then start. Do not wait for confirmation.
 
 ## Run
 
