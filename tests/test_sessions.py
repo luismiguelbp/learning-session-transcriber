@@ -88,3 +88,25 @@ def test_load_session_config_rejects_download_only_with_prompts(tmp_path: Path) 
 
     with pytest.raises(ValueError, match="download_only"):
         load_session_config(config_path)
+
+
+def test_load_session_config_rejects_content_name_path_escape(tmp_path: Path) -> None:
+    config_path = tmp_path / "session.yaml"
+    _write_valid_session(config_path, content_name="../outside")
+
+    with pytest.raises(ValueError, match="content_name"):
+        load_session_config(config_path)
+
+
+def test_load_session_config_rejects_pdf_path_escape(tmp_path: Path) -> None:
+    config_path = tmp_path / "session.yaml"
+    data = {
+        "content_name": "pdf_escape",
+        "topic": "Test Topic",
+        "videos": [{"index": 1, "title": "Clip", "url": "https://example.com/video-1"}],
+        "pdf": {"title": "Notes", "path": "../secret.pdf"},
+    }
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="pdf.path"):
+        load_session_config(config_path)
