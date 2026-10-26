@@ -123,9 +123,36 @@ class SessionConfig:
         return self.main_postprocess_prompts or []
 
 
+def _require_output_name(value: str) -> str:
+    """Keep content_name as one path segment so outputs stay under outputs/."""
+    name = value.strip()
+    if (
+        not name
+        or name in {".", ".."}
+        or "/" in name
+        or "\\" in name
+        or "\x00" in name
+    ):
+        raise ValueError("content_name must be a single path segment without separators")
+    return name
+
+
+def _resolve_within_session(session_dir: Path, relative: str, label: str) -> Path:
+    """Resolve a session-relative path and reject escapes outside that directory."""
+    if "\x00" in relative or relative.startswith(("/", "\\")):
+        raise ValueError(f"{label} must be a path inside the session directory")
+    root = session_dir.resolve()
+    resolved = (root / relative).resolve()
+    if not resolved.is_relative_to(root):
+        raise ValueError(f"{label} must stay inside the session directory")
+    return resolved
+
+
 def _validate_include_resource_file(key: str, path_str: str, session_dir: Path) -> None:
     """Validate that an include_resources path resolves to a readable file."""
-    resolved_path = (session_dir / path_str).resolve()
+    resolved_path = _resolve_within_session(
+        session_dir, path_str, f"include_resources key {key!r}"
+    )
     if not resolved_path.exists():
         raise ValueError(
             f"include_resources key {key!r} points to missing file: {path_str!r} "
@@ -241,6 +268,7 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
         # a PDF section is present.
         if not pdf_path:
             raise ValueError("pdf.path is required in session configuration when 'pdf' is defined")
+        _resolve_within_session(config_path.parent, pdf_path, "pdf.path")
         pdf_cfg = PdfConfig(title=pdf_title, path=pdf_path)
 
     language = str(raw.get("language") or "es")
@@ -263,9 +291,9 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
         prompts_file_str = str(prompts_file).strip()
         if prompts_file_str:
             # Resolve relative to the session directory
-            session_dir = config_path.parent
-            resolved_path = (session_dir / prompts_file_str).resolve()
-            prompts_path = resolved_path
+            prompts_path = _resolve_within_session(
+                config_path.parent, prompts_file_str, "prompts_file"
+            )
 
     # Optional include_resources: key -> path (relative to session directory).
     include_resources: Optional[Dict[str, str]] = None
@@ -293,7 +321,7 @@ def _validate_and_build(raw: dict, config_path: Path) -> SessionConfig:
                 _validate_include_resource_file(key, path_str, config_path.parent)
 
     return SessionConfig(
-        content_name=str(raw["content_name"]),
+        content_name=_require_output_name(str(raw["content_name"])),
         topic=str(raw["topic"]),
         videos=sorted(videos, key=lambda v: v.index),
         pdf=pdf_cfg,
